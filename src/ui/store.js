@@ -22,7 +22,7 @@ export function blankJob(units = 'mm') {
   return {
     version: 1, name: '', units,
     kerf: units === 'in' ? 3.175 : 3.2, trim: 0, bandThickness: 0,
-    minOffcut: units === 'in' ? 101.6 : 100, firstCut: 'auto',
+    minOffcut: units === 'in' ? 101.6 : 100, firstCut: 'auto', favor: 'offcuts',
     stock: [stock], panels: [blankPanel({ stockId: stock.id })],
   };
 }
@@ -40,6 +40,8 @@ export function normalizeJob(raw) {
     kerf: num(raw.kerf), trim: num(raw.trim) ?? 0, bandThickness: num(raw.bandThickness) ?? 0,
     minOffcut: num(raw.minOffcut) ?? 100,
     firstCut: ['rip', 'cross'].includes(raw.firstCut) ? raw.firstCut : 'auto',
+    // jobs saved before this setting existed get the behaviour they always had
+    favor: raw.favor === 'cuts' ? 'cuts' : 'offcuts',
     stock: raw.stock.map((s) => ({
       id: String(s.id ?? newId('s')), material: String(s.material ?? ''),
       thickness: num(s.thickness), length: num(s.length), width: num(s.width),
@@ -69,8 +71,9 @@ export function normalizeJob(raw) {
 
 /** Only what affects the plan: renaming the job or switching display units does not make a plan stale. */
 export function jobHash(job) {
-  const { name, units, ...rest } = job;
-  return JSON.stringify(rest);
+  const { name, units, favor, ...rest } = job;
+  // the default is left out so plans saved before the setting existed still count as up to date
+  return JSON.stringify(favor === 'cuts' ? { ...rest, favor } : rest);
 }
 
 export const store = {

@@ -33,6 +33,11 @@ export function createResultsView(root, ctx) {
     const biggest = offcuts.slice().sort((a, b) => b.w * b.h - a.w * a.h)[0];
     const allAtFloor = result.groups.every((g) => g.sheets === g.lowerBound && !g.unplaced);
 
+    const fewerCuts = result.favor === 'cuts' && result.compare;
+    const saved = fewerCuts ? result.compare.cuts - t.cuts : 0;
+    const cutsNote = fewerCuts && saved > 0 ? `${saved} fewer than with large offcuts · ${formatRun(t.cutLength, u)} of sawing` : `${formatRun(t.cutLength, u)} of sawing`;
+    const offcutText = (area, big) => `${formatArea(area, u)}${big && big.w ? `, largest ${dims(big.w, big.h, u)}${unitSuffix(u)}` : ''}`;
+
     const stat = (value, label, note) => h('div', { class: 'stat' },
       h('div', { class: 'stat-value' }, value), h('div', { class: 'stat-label' }, label), note ? h('div', { class: 'stat-note' }, note) : null);
 
@@ -57,14 +62,36 @@ export function createResultsView(root, ctx) {
         stat(String(t.sheets), t.sheets === 1 ? 'sheet' : 'sheets', allAtFloor ? 'the fewest possible' : null),
         stat(pct(yieldPct), 'of the stock becomes parts', `${formatArea(t.partsArea, u)} of ${formatArea(t.stockArea, u)}`),
         stat(formatArea(t.offcutArea, u), 'reusable offcuts', biggest ? `largest ${dims(biggest.w, biggest.h, u)}${unitSuffix(u)}` : 'none worth keeping'),
-        stat(String(t.cuts), 'cuts', `${formatRun(t.cutLength, u)} of sawing`),
+        stat(String(t.cuts), 'cuts', cutsNote),
         t.cost != null ? stat(money(t.cost), 'sheet cost', 'for sheets with a price') : null),
       h('h3', null, 'How well it did'),
       h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
-        h('thead', null, h('tr', null, h('th', null, 'Material'), h('th', { class: 'num' }, 'Sheets'), h('th', { class: 'num' }, 'Parts'), h('th', { class: 'num' }, 'Used for parts'), h('th', null, 'Sheet count'))),
+        h('thead', null, h('tr', null, h('th', null, 'Material'), h('th', { class: 'num' }, 'Sheets'), h('th', { class: 'num' }, 'Parts'), h('th', { class: 'num' }, 'Used'), h('th', null, 'Sheet count'))),
         h('tbody', null, groupRows))),
       h('p', { class: 'fine' }, '“Fewest possible” means the parts’ total area could not fit on fewer sheets, whatever the layout. ',
         'Every plan is re-checked after it is made: no overlaps, kerf between all parts, correct material, faces, grain and quantities.'),
+      h('h3', null, 'Cuts'),
+      fewerCuts
+        ? h('div', { class: 'favor-note' },
+          h('p', null, 'This plan favours ', h('strong', null, 'fewer cuts'), '. ',
+            saved > 0
+              ? `It takes ${t.cuts} cuts where favouring large offcuts takes ${result.compare.cuts} — ${saved} fewer — on ${t.sheets < result.compare.sheets ? 'fewer' : 'the same number of'} sheets.`
+              : 'No layout with fewer cuts was found, so it is the same plan you would get favouring large offcuts.'),
+          saved > 0 ? h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
+            h('thead', null, h('tr', null, h('th', null, 'Favouring'), h('th', { class: 'num' }, 'Cuts'), h('th', { class: 'num' }, 'Sawing'), h('th', null, 'Reusable offcuts'))),
+            h('tbody', null,
+              h('tr', null, h('td', { class: 'strong' }, 'Fewer cuts (this plan)'), h('td', { class: 'num strong' }, String(t.cuts)), h('td', { class: 'num' }, formatRun(t.cutLength, u)), h('td', null, offcutText(t.offcutArea, biggest))),
+              h('tr', null, h('td', null, 'Large offcuts'), h('td', { class: 'num' }, String(result.compare.cuts)), h('td', { class: 'num' }, formatRun(result.compare.cutLength, u)), h('td', null, offcutText(result.compare.offcutArea, result.compare.largestOffcut)))))) : null)
+        : h('p', { class: 'favor-note' }, 'This plan favours ', h('strong', null, 'large offcuts'), '. If you would rather make fewer cuts, choose “Fewer cuts” under Saw & settings on the Job tab and recalculate; the plan will show how many cuts that saves and what it costs in offcuts.'),
+      h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
+        h('thead', null, h('tr', null, h('th', null, 'Sheet'), h('th', null, 'Material'), h('th', { class: 'num' }, 'Parts'), h('th', { class: 'num' }, 'Cuts'), h('th', { class: 'num' }, 'Used'))),
+        h('tbody', null,
+          result.sheets.map((s) => {
+            const st = result.stocks[s.stockIdx];
+            return h('tr', null, h('td', { class: 'nowrap' }, h('a', { href: `#sheet-${s.n}` }, `Sheet ${s.n}`)), h('td', null, st.material),
+              h('td', { class: 'num' }, String(s.placements.length)), h('td', { class: 'num' }, String(s.steps.length)), h('td', { class: 'num' }, pct(s.partsArea / (st.L * st.W))));
+          }),
+          h('tr', { class: 'total-row' }, h('td', { colspan: 2 }, 'Total'), h('td', { class: 'num' }, String(t.pieces)), h('td', { class: 'num' }, String(t.cuts)), h('td', { class: 'num' }, pct(yieldPct)))))),
       h('h3', null, 'Sheets to pull or buy'),
       h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
         h('thead', null, h('tr', null, h('th', null, 'Sheet'), h('th', null, 'Faces'), h('th', { class: 'num' }, 'Needed'), h('th', { class: 'num' }, 'Cost'))),

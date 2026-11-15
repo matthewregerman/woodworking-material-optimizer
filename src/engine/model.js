@@ -227,6 +227,8 @@ export function analyzeJob(job) {
     units, kerf, trim, band,
     minOffcut: toU(minOffcutMm),
     firstCut: job.firstCut === 'rip' || job.firstCut === 'cross' ? job.firstCut : 'auto',
+    // what to favour once the sheet count is settled: 'offcuts' (default) or 'cuts'
+    favor: job.favor === 'cuts' ? 'cuts' : 'offcuts',
     stocks, panels,
     groups: [...groups.values()].filter((g) => g.panels.length > 0),
     pieceCount,

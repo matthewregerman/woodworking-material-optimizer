@@ -16,17 +16,18 @@
     </div>
     <input id="job-name" class="job-name" type="text" placeholder="Name this job" aria-label="Job name" autocomplete="off">
     <div class="menu-wrap">
-      <button id="menu-btn" class="btn" type="button" aria-haspopup="true" aria-expanded="false">Job file ▾</button>
+      <button id="menu-btn" class="btn" type="button" aria-haspopup="true" aria-expanded="false">Project Files ▾</button>
       <div id="menu" class="menu" hidden>
         <button type="button" data-act="example">Load the example job</button>
         <button type="button" data-act="new">New empty job</button>
         <hr>
         <button type="button" data-act="import">Open a job file…</button>
         <button type="button" data-act="export">Save job to a file</button>
-        <hr>
-        <button type="button" data-act="print">Print the cutting plan</button>
       </div>
     </div>
+    <button id="print-btn" class="btn icon" type="button" title="Print the cutting plan" aria-label="Print the cutting plan">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><rect x="7" y="14" width="10" height="7" fill="#fff"/><path d="M17 12.5h.01"/></svg>
+    </button>
   </header>
 
   <nav class="tabs" role="tablist" aria-label="Views">

@@ -152,7 +152,8 @@ export function sheetDiagram(sheet, result, units, opts) {
     const hit = s('line', { ...l, class: 'cut-hit', dataset: { step: st.n } });
     badges.append(hit);
     if (!showNumbers && st.n !== selected) continue;
-    const cx = (l.x1 + l.x2) / 2, cy = (l.y1 + l.y2) / 2;
+    // off-centre, so the number does not sit on top of the part names in narrow strips
+    const cx = l.x1 + (l.x2 - l.x1) * 0.78, cy = l.y1 + (l.y2 - l.y1) * 0.78;
     const cls = `badge${done[st.n - 1] ? ' done' : ''}${st.n === selected ? ' sel' : ''}`;
     badges.append(s('g', { class: cls, dataset: { step: st.n } },
       s('circle', { cx, cy, r: st.n > 99 ? 10 : 8 }),

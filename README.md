@@ -28,8 +28,9 @@ app in one file. It saves in that browser only (no phone sync). After changing
 anything under `src/`, regenerate it with `npm install && npm run build`.
 
 The app opens with a realistic example job (three kitchen base cabinets in four
-materials). Press **Calculate cutting plan** to see it work. "Job file ▾" has
-*New empty job*, *Load the example job*, open/save a job as a file, and print.
+materials). Press **Calculate cutting plan** to see it work. "Project Files ▾" has
+*New empty job*, *Load the example job* and open/save a job as a file; the
+printer button beside it prints the plan.
 
 ## Tests
 
@@ -37,7 +38,7 @@ materials). Press **Calculate cutting plan** to see it work. "Job file ▾" has
 npm test
 ```
 
-66 tests, about 30 seconds. See "How it was tested" below.
+77 tests, about 40 seconds. See "How it was tested" below.
 
 ## What you enter
 
@@ -50,6 +51,7 @@ npm test
 | Edge trim | Taken off all four edges of every sheet before anything is laid out, for damaged or out-of-square factory edges. 0 = use the factory edges. |
 | Edge banding thickness *(more options)* | If your banding is thick (e.g. 2 mm), cut sizes are reduced by this much per banded edge so the finished size comes out right. Leave 0 for thin iron-on tape. |
 | Smallest offcut worth keeping *(more options)* | Leftovers narrower than this count as waste instead of offcuts. |
+| After using as few sheets as possible, prefer | **Large offcuts** (the default) or **Fewer cuts**. See "Large offcuts or fewer cuts" below. |
 | First cuts on a full sheet *(more options)* | No preference, rip first (table saw friendly) or crosscut first (easier to handle). |
 
 **Stock sheets** — material (free text), thickness, length, width, which way the
@@ -66,8 +68,11 @@ ends get edge banding.
 
 - **Summary** — sheets used, percentage of the stock that becomes parts,
   reusable offcut area, number of cuts and metres of sawing, cost, a per-material
-  table saying whether the sheet count is provably the fewest possible, a
-  shopping list, and the total length of edge banding.
+  table saying whether the sheet count is provably the fewest possible, the
+  number of cuts on every sheet and in total, a shopping list, and the total
+  length of edge banding. When the plan favours fewer cuts it also shows, side
+  by side, what favouring large offcuts would have given (cuts, metres of
+  sawing, offcuts).
 - **A to-scale drawing of every sheet** — parts labelled with name and cut size,
   offcuts with their sizes, waste hatched, every cut drawn kerf-wide and
   numbered, grain direction marked.
@@ -81,7 +86,7 @@ ends get edge banding.
 - **Cut list** — every panel with quantity, cut size, finished size (when
   banding thickness changes it), grain, faces, banded edges and which sheets it
   is on.
-- **Print** — Job file ▾ → Print gives one page per sheet with the drawing and a
+- **Print** — the printer button in the header gives one page per sheet with the drawing and a
   check-box list of its cuts, then the cut list.
 
 ### How to read a cut
@@ -100,7 +105,9 @@ ends get edge banding.
   shape of the piece in your hands.
 - With edge trim on, the first two cuts on each sheet clean one long edge and
   one end. Everything after is measured from those two fresh edges. The far
-  edges are only trimmed where a part actually reaches them.
+  edges are only trimmed where a part actually reaches them. (When favouring
+  fewer cuts, a far edge that two or more parts end on is trimmed once, up
+  front, instead of once per part.)
 
 ## The rules it guarantees
 
@@ -133,9 +140,11 @@ need a stopped or L-shaped cut are never produced, even where they would save
 material.
 
 **What "best" means,** in this order: (1) place every part, (2) fewest sheets,
-(3) least stock area when sheets come in several sizes, (4) leftover gathered
-into the largest possible offcuts rather than scattered slivers, (5) fewer
-cuts. Price is reported but not optimized — you asked for fewest sheets first.
+(3) least stock area when sheets come in several sizes, and then whichever you
+chose on the job: (4a) **large offcuts** — leftover gathered into the largest
+possible pieces rather than scattered slivers — or (4b) **fewer cuts**, with
+offcut size as the tie-break. Price is reported but not optimized — you asked
+for fewest sheets first.
 
 **How it searches.** Parts are dropped one at a time into free rectangles,
 each of which is then split by a straight cut; the result is a tree of cuts.
@@ -166,7 +175,8 @@ from a list built from your stock sheets, so they cannot be mistyped.
 
 **Edge trim** is the total removed per edge including the blade. Only the two
 reference edges are always trimmed; a far edge is trimmed only where a part
-reaches it, which saves cuts.
+reaches it, which saves cuts. In fewer-cuts mode, a far edge that several parts
+end on is trimmed in one pass instead.
 
 **Edge banding** is counted per panel as number of long edges and number of
 ends. With a banding thickness set, cut length is reduced by the banded ends
@@ -187,10 +197,106 @@ which parts are missing.
 cuts are also written to `data/state.json` on the computer, and any device that
 opens the page picks up the newest copy (checked on load, when the page regains
 focus, and every 20 seconds). Newest save wins; it is not built for two people
-editing at once.
+editing at once. After updating the app, reload any page that is still open
+(on the phone too): a page running the old version does not know about newer
+settings and will drop them when it saves.
 
 **One job at a time.** Use *Save job to a file* / *Open a job file* to keep
 several.
+
+## Large offcuts or fewer cuts
+
+Under **Saw & settings** you choose what the optimizer favours once the sheet
+count is as low as it can get:
+
+- **Large offcuts** (default, and exactly what the app did before this option
+  existed). Leftover is gathered into the biggest pieces possible. This can
+  cost cuts: to keep a big offcut whole, small parts get packed tightly
+  elsewhere, each needing its own two cuts.
+- **Fewer cuts.** Fewer cuts to measure and make. Leftover may end up in
+  smaller pieces, or spread over more of the sheets you were using anyway.
+
+### What it promises
+
+Fewer-cuts mode never uses more sheets, never uses more stock area, and never
+leaves out more parts than large-offcuts mode does on the same job. It also
+never takes *more* cuts. These are not tendencies; they hold by construction
+(see below) and are tested on every plan in the test suite.
+
+### What counts as a cut
+
+A cut is one step in the cutting order: one pass of the saw, edge to edge,
+across one piece — trim cuts included. It is the same number shown on the
+drawings and in the step list, so what is minimised is exactly what you count
+at the saw. (A test checks that the number the search minimises equals the
+number of steps produced, sheet by sheet.) Total metres of sawing is shown but
+not minimised: fewer, longer cuts can add up to slightly more sawing, and the
+comparison table shows it when that happens.
+
+### Where cuts are saved
+
+Cutting one part out of a bigger piece normally takes two cuts, one for its
+width and one for its length. A cut is saved whenever a part is exactly as
+wide or as long as the piece it comes from. So fewer cuts means lining parts
+of equal size up in strips: rip one strip to width and every crosscut then
+frees a finished part. Eight 100 mm frame pieces cut from one 100 mm strip
+take about nine cuts; scattered around a sheet they take sixteen.
+
+### How it searches
+
+1. The normal large-offcuts solve runs first, unchanged. Its result is the
+   **ceiling**: its sheet count, stock area and number of placed parts.
+2. A second whole-job search runs with an objective that counts cuts, and with
+   one extra placement rule ("put the part where it fits a side exactly"). Its
+   result is kept only if it is within the ceiling.
+3. For each of those two layouts, every sheet is re-packed on its own for
+   fewer cuts, and then pairs of sheets are pooled and re-packed so that parts
+   of the same size can move onto the same sheet. A re-pack is accepted only
+   if everything still fits on the same sheets and the cut count drops.
+4. With edge trim on, a far edge that two or more parts end on is trimmed once
+   for the whole sheet instead of once per part.
+5. The layout with the fewest cuts wins; ties go to the better offcuts. If
+   nothing beats the ceiling layout, that layout is returned as it is.
+
+Because step 1 is the ordinary solve and nothing is accepted that is worse
+than it on sheets, stock or placed parts, the promises above cannot be broken
+by a bad search — the worst case is "no cuts saved".
+
+Why not simply add "cuts" to the normal objective? Because sheet count is
+found by a search that leans on offcut quality to push material off the
+emptiest sheet; mixing cuts into it could occasionally cost a sheet. Running
+the proven solve first and treating it as a ceiling keeps the two concerns
+apart.
+
+### What it costs
+
+- **Time:** about twice as long, since it does the normal solve and then the
+  cut search (under a second for the kitchen job and the example; up to a
+  few seconds for jobs with 50+ pieces on many sheets).
+- **Offcuts:** the big clean offcut can go. On the kitchen job below, large
+  offcuts leaves a nearly whole 2335 × 1219 sheet of birch; fewer cuts leaves
+  a 2438 × 586 strip and smaller pieces instead.
+
+### Measured
+
+| Job | Sheets (both modes) | Cuts, large offcuts | Cuts, fewer cuts |
+| --- | --- | --- | --- |
+| Kitchen cabinets and frame — 36 pieces, 3 laminate + 2 birch sheets | 5 | 61 | 54 |
+| Built-in example — 44 pieces, 4 materials, 10 mm edge trim | 5 | 80 | 72 |
+| Stair cabinets — 12 pieces, 1 sheet | 1 | 17 | 17 |
+| 20 random cabinet-style jobs — 711 pieces | 148 | 1346 | 1212 |
+
+For reference, CutList Optimizer cut the kitchen job from the same 5 sheets in
+55 cuts and the stair job in 17. The plan shows the comparison itself: in
+fewer-cuts mode the summary lists both modes' cuts, sawing and offcuts side by
+side, because the large-offcuts layout has already been worked out on the way.
+
+### Saved jobs
+
+Jobs and plans saved before this option existed load as "large offcuts" and
+their saved plan still counts as up to date. The setting is stored in the job
+(and in job files); switching it marks the plan out of date until you
+recalculate.
 
 ## Limits and things to know
 
@@ -211,6 +317,9 @@ several.
   address can open and change the current job. It only serves the app's own
   files and reads/writes `data/state.json`. To keep it to this computer only:
   `HOST=127.0.0.1 npm start`.
+- **Fewer cuts is a search too.** It finds layouts with fewer cuts, not
+  provably the fewest. On a job where it finds nothing better it hands back the
+  large-offcuts plan and says so.
 - Identical sheets are listed separately rather than "cut 2 of these".
 - No dark mode. Light theme only, for a bright shop.
 - Largest job: 1,500 pieces.
@@ -234,6 +343,12 @@ Automated (`npm test`):
 - `test/quality.test.js` — matches an exhaustive solver on small jobs,
   reassembles cut-up sheets, known-answer multi-sheet jobs, never worse than
   simple shelf packing, leftover is consolidated.
+- `test/fewer-cuts.test.js` — the fewer-cuts option: on 100 random jobs plus
+  the example and a real 36-piece kitchen job it never uses more sheets, more
+  stock or leaves out more parts than the default, never takes more cuts, and
+  every plan passes the verifier; the default is unchanged by the option; the
+  cut count the search minimises equals the number of steps in the cutting
+  order; whole-edge trimming; older saved jobs load with the old behaviour.
 - `test/model.test.js` — bad input is rejected with the right message on the
   right field.
 - `test/units.test.js`, `test/text.test.js` — parsing/formatting of lengths and
@@ -244,7 +359,10 @@ loading the example, calculating, stepping through cuts, ticking them off,
 tapping parts and cut numbers, invalid input of several kinds, inches, running
 out of stock, the menu and replace-job dialog, reload persistence, a second
 "device" picking up the plan from the server, the print layout (emulated on
-screen), and the single-file version opened straight from disk.
+screen), the single-file version opened straight from disk, and switching
+between large offcuts and fewer cuts (the plan goes "out of date", recalculating
+redraws every sheet and its cutting order, and a job saved before the option
+existed opens with its plan still current).
 
 ## Files
 

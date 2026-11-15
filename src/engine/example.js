@@ -50,6 +50,7 @@ export function exampleJob() {
     bandThickness: 0,
     minOffcut: 100,
     firstCut: 'auto',
+    favor: 'offcuts',
     stock,
     panels,
   };

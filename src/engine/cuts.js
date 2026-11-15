@@ -14,7 +14,10 @@
 //         to set on the fence / mark from the reference edge), or null
 //   b     the part on the far side, or null if the blade runs off the edge
 
-export function buildCutPlan({ L, W, trim, kerf, root, minOffcut, panelOfItem }) {
+// farTrim { x, y }: also trim that far edge up front, in one pass, instead of
+// where each part reaches it (used when favouring fewer cuts).
+
+export function buildCutPlan({ L, W, trim, kerf, root, minOffcut, panelOfItem, farTrim }) {
   const steps = [];
   const placements = [];
   const leftovers = [];
@@ -88,6 +91,13 @@ export function buildCutPlan({ L, W, trim, kerf, root, minOffcut, panelOfItem })
       if (part) { part.kind = 'work'; part.next = step.n; }
       leaf(step.a, true);
       wp = step.b; from = step.n; part = step.b;
+    }
+    for (const dir of ['y', 'x']) {
+      if (!(dir === 'y' ? farTrim?.x : farTrim?.y)) continue;
+      const step = cut(dir, wp, (dir === 'y' ? L : W) - trim, 'trim', from);
+      part.kind = 'work'; part.next = step.n;
+      leaf(step.b, true);
+      wp = step.a; from = step.n; part = step.a;
     }
   }
   if (root.item >= 0) process(root, wp, from, part);

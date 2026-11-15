@@ -127,6 +127,16 @@ export function createJobView(root, ctx) {
           h('span', { class: 'hint' }, units() === 'in' ? 'Fractions are fine: 23 1/2, 3/4.' : 'Switching units converts what you have entered.')),
         lenSetting('kerf'),
         lenSetting('trim')),
+      h('fieldset', { class: 'choice' },
+        h('legend', { class: 'setting-label' }, 'After using as few sheets as possible, prefer'),
+        h('div', { class: 'choice-opts' },
+          [
+            ['offcuts', 'Large offcuts', 'Leftover is kept together in the biggest pieces possible, ready for the next job. May take more cuts.'],
+            ['cuts', 'Fewer cuts', 'Fewer cuts to measure and make. Leftover may end up in smaller pieces, or spread across more of the sheets.'],
+          ].map(([value, title, text]) => h('label', { class: 'choice-opt' },
+            h('input', { type: 'radio', name: 'favor', value, checked: (j.favor === 'cuts' ? 'cuts' : 'offcuts') === value, dataset: { kind: 'settings', field: 'favor', type: 'radio' } }),
+            h('span', { class: 'choice-text' }, h('strong', null, title), h('span', { class: 'hint' }, text))))),
+        h('span', { class: 'hint' }, 'Either way the plan never uses more sheets. “Fewer cuts” takes about twice as long to work out, and the plan shows how many cuts it saved.')),
       h('details', { class: 'more', open: Boolean(j.bandThickness) || j.firstCut !== 'auto' },
         h('summary', null, 'More options'),
         h('div', { class: 'settings-grid' },
@@ -274,6 +284,7 @@ export function createJobView(root, ctx) {
     if (type === 'num') { const t = raw.trim().replace(',', '.'); return t === '' ? null : /^\d*\.?\d+$/.test(t) ? Number(t) : NaN; }
     if (type === 'select') { const f = el.closest('.f'); return /f-(faces|bandL|bandW)/.test(f?.className ?? '') ? Number(raw) : raw; }
     if (type === 'material') return raw || null;
+    if (type === 'radio') return raw;
     return raw;
   }
 

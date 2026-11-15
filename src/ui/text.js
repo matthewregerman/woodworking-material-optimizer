@@ -44,10 +44,24 @@ export function describeStep(step, sheet, result, units) {
 
   if (step.kind === 'trim') {
     const off = formatU(result.trim, units) + u;
-    const edgeName = (step.dir === 'x') === (stock.L >= stock.W) ? 'one long edge' : 'one short edge';
+    const long = (step.dir === 'x') === (stock.L >= stock.W);
+    // the two reference edges come off first (the waste is the near part); a
+    // far edge is only trimmed up front when several parts end on it
+    const far = Boolean(step.a) && step.a.kind !== 'waste';
+    if (far) {
+      const kept = formatU(step.dir === 'x' ? step.a.h : step.a.w, units) + u;
+      return {
+        verb, rip, isTrim: true,
+        title: `Trim ${off} off the opposite ${long ? 'long' : 'short'} edge`,
+        measure: null,
+        take: `Take ${source}.`,
+        how: `${verb} at ${kept} from the reference edge, removing ${off} in total (blade included). Several parts end on this edge, so it is trimmed once for all of them.`,
+        a, b,
+      };
+    }
     return {
       verb, rip, isTrim: true,
-      title: `Trim ${off} off ${edgeName}`,
+      title: `Trim ${off} off one ${long ? 'long' : 'short'} edge`,
       measure: null,
       take: `Take ${source}.`,
       how: `${verb} a clean edge, removing ${off} in total (blade included). This becomes a reference edge: later cuts are measured from it.`,

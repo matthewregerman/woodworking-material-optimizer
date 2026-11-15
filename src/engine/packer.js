@@ -10,11 +10,16 @@
 //   1. fewest pieces left unplaced (only happens when stock runs out)
 //   2. fewest sheets
 //   3. least stock area (matters when sheets come in several sizes)
-//   4. leftover gathered into the biggest possible offcuts, fewer cuts
+//   4. leftover gathered into the biggest possible offcuts
+//
+// With the job's "favor" set to 'cuts', a further stage (reduceCuts) takes
+// that layout as a ceiling and looks for one with fewer saw cuts that is no
+// worse on points 1-3.
 
 import { orientationMask } from './model.js';
 
 const CHOICES = 4;
+const CUT_CHOICES = 5; // the fewer-cuts search adds an "exact fit first" placement rule
 const SPLITS = 8;
 
 export function mulberry32(seed) {
@@ -44,7 +49,7 @@ export function buildGroupProblem(problem, group) {
   }
   let refArea = 0;
   for (const s of stocks) refArea = Math.max(refArea, s.L * s.W);
-  return { k: problem.kerf, firstCut: problem.firstCut, stocks, types, itemType, refArea };
+  return { k: problem.kerf, trim: problem.trim, favor: problem.favor, firstCut: problem.firstCut, stocks, types, itemType, refArea };
 }
 
 function score(choice, F, dx, dy) {
@@ -53,7 +58,9 @@ function score(choice, F, dx, dy) {
     case 0: return F.w * F.h - dx * dy;
     case 1: return rw < rh ? rw * 1e8 + rh : rh * 1e8 + rw;
     case 2: return rw < rh ? rh * 1e8 + rw : rw * 1e8 + rh;
-    default: return F.x * 1e8 + F.y;
+    case 3: return F.x * 1e8 + F.y;
+    // a side that fits exactly needs no cut: fewest new cuts first, then tightest fit
+    default: return ((rw > 0 ? 1 : 0) + (rh > 0 ? 1 : 0)) * 1e15 + (rw < rh ? rw * 1e8 + rh : rh * 1e8 + rw);
   }
 }
 
@@ -138,6 +145,9 @@ function decode(P, order, prm) {
   const { k, types, itemType, stocks, firstCut } = P;
   const { choice, split, sheetFirst, stockOrder } = prm;
   const forcedRoot = firstCut !== 'auto';
+  // With edge trim, a piece that reaches the far edge of the usable area still
+  // needs a cut there. Only the fewer-cuts search counts those.
+  const farCuts = P.cutsMode === true && P.trim > 0;
   const sheets = [];
   const used = new Array(stocks.length).fill(0);
   const unplacedItems = [];
@@ -198,7 +208,9 @@ function decode(P, order, prm) {
     if (F.right) free.push(F.right);
     if (F.top) free.push(F.top);
     if (F.w > dx) cuts++;
+    else if (farCuts && F.x + F.w === stocks[bSheet.stock].L) { cuts++; bSheet.farX = (bSheet.farX ?? 0) + 1; }
     if (F.h > dy) cuts++;
+    else if (farCuts && F.y + F.h === stocks[bSheet.stock].W) { cuts++; bSheet.farY = (bSheet.farY ?? 0) + 1; }
     bSheet.area += dx * dy;
   }
 
@@ -216,6 +228,17 @@ function decode(P, order, prm) {
     let left = 0;
     for (const it of unplacedItems) left += types[itemType[it]].value;
     f = 1e3 * left - Q + 0.002 * cuts;
+  } else if (P.cutsMode) {
+    // every cut counts as much as a whole sheet's worth of offcut quality
+    if (farCuts) {
+      for (const sh of sheets) {
+        cuts += 2; // the two reference-edge trims
+        // a far edge that several pieces end on is trimmed once for all of them
+        if (sh.farX > 1) cuts -= sh.farX - 1;
+        if (sh.farY > 1) cuts -= sh.farY - 1;
+      }
+    }
+    f = 1e6 * unplacedItems.length + 1e4 * sheets.length + 100 * (stockArea / P.refArea) + cuts - 0.5 * Q;
   } else {
     f = 1e6 * unplacedItems.length + 1e4 * sheets.length + 100 * (stockArea / P.refArea) - Q + 0.002 * cuts;
   }
@@ -302,7 +325,7 @@ function mutateOrder(order, rng, itemType) {
 function mutatePrm(prm, rng, P) {
   const p = { ...prm };
   const r = rng();
-  if (r < 0.35) p.choice = (rng() * CHOICES) | 0;
+  if (r < 0.35) p.choice = (rng() * (P.cutsMode ? CUT_CHOICES : CHOICES)) | 0;
   else if (r < 0.8) p.split = (rng() * SPLITS) | 0;
   else if (r < 0.9 || P.stocks.length < 2) p.sheetFirst = !p.sheetFirst;
   else {
@@ -328,12 +351,13 @@ export function* search(P, opts = {}) {
 
   const orders = baseOrders(P);
   const sOrders = stockOrders(P);
-  const sweepTotal = orders.length * sOrders.length * CHOICES * SPLITS * 2;
+  const choices = P.cutsMode ? CUT_CHOICES : CHOICES;
+  const sweepTotal = orders.length * sOrders.length * choices * SPLITS * 2;
   const total = sweepTotal + iterations;
   sweep:
   for (const order of orders) {
     for (const stockOrder of sOrders) {
-      for (let choice = 0; choice < CHOICES; choice++) {
+      for (let choice = 0; choice < choices; choice++) {
         for (let split = 0; split < SPLITS; split++) {
           for (let sf = 0; sf < 2; sf++) {
             const sol = decode(P, order, { choice, split, sheetFirst: sf === 1, stockOrder });
@@ -357,7 +381,8 @@ export function* search(P, opts = {}) {
       if (c.f - starts[starts.length - 1].f > 1e-9) starts.push(c);
     }
     const per = Math.ceil(iterations / starts.length);
-    const T0 = 0.05, T1 = 0.0005;
+    // temperatures are in units of the objective: offcut quality, or whole cuts
+    const T0 = P.cutsMode ? 1.2 : 0.05, T1 = P.cutsMode ? 0.03 : 0.0005;
     outer:
     for (const st of starts) {
       let cur = st;
@@ -419,7 +444,7 @@ function subProblem(P, items, stockCounts, extra = {}) {
   // items must be grouped by type for baseOrders(); sort and remember the mapping
   const perm = items.map((_, i) => i).sort((a, b) => itemType[a] - itemType[b] || a - b);
   const sub = {
-    k: P.k, firstCut: P.firstCut,
+    k: P.k, trim: P.trim, cutsMode: P.cutsMode, firstCut: P.firstCut,
     stocks: sIdx.map((si) => ({ ...P.stocks[si], qty: stockCounts.get(si) })),
     types, itemType: perm.map((i) => itemType[i]),
     refArea: P.refArea,
@@ -625,12 +650,12 @@ function* drainWeakest(P, sheets, opts) {
 }
 
 /**
- * Full solve for one material group: broad search, pair improvement, then
- * polish (smaller stock where possible, biggest offcuts, final split
- * directions). A generator yielding progress 0..1; returns
- * { sheets: [{ stock, root, area }], unplacedItems }.
+ * The standard solve for one material group, favouring large offcuts: broad
+ * search, pair improvement, then polish (smaller stock where possible,
+ * biggest offcuts, final split directions). A generator yielding progress
+ * 0..1; returns { sheets: [{ stock, root, area }], unplacedItems }.
  */
-export function* solveGroup(P, opts = {}) {
+function* solveForOffcuts(P, opts = {}) {
   const { k, stocks } = P;
   const forcedRoot = P.firstCut !== 'auto';
   const polish = opts.polishIterations ?? 400;
@@ -744,6 +769,179 @@ export function* solveGroup(P, opts = {}) {
 
   for (const sh of sheets) { sh.root.root = true; applyFlips(sh.root, k, forcedRoot); }
   return { sheets, unplacedItems: best.unplacedItems.slice() };
+}
+
+// Counts the cuts a sheet needs, and how many of them are there only because
+// a piece that otherwise fits exactly ends on a far edge that still has its
+// edge trim on it.
+function tallyCuts(P, sh) {
+  const st = P.stocks[sh.stock];
+  const t = P.trim > 0;
+  let cuts = t ? 2 : 0, farX = 0, farY = 0;
+  const stack = [sh.root];
+  while (stack.length) {
+    const n = stack.pop();
+    if (n.item < 0) continue;
+    if (n.w > n.dx) cuts++;
+    else if (t && n.x + n.w === st.L) { cuts++; farX++; }
+    if (n.h > n.dy) cuts++;
+    else if (t && n.y + n.h === st.W) { cuts++; farY++; }
+    if (n.right) stack.push(n.right);
+    if (n.top) stack.push(n.top);
+  }
+  return { cuts, farX, farY };
+}
+
+/**
+ * Fewer-cuts mode only: should a far edge of this sheet be trimmed in one
+ * pass before the parts are cut? Worth it when two or more pieces end
+ * exactly on that edge, because each would otherwise need its own trim cut.
+ */
+export function farTrimPlan(P, sh) {
+  if (P.favor !== 'cuts' && !P.cutsMode) return { x: false, y: false };
+  const { farX, farY } = tallyCuts(P, sh);
+  return { x: farX > 1, y: farY > 1 };
+}
+
+/**
+ * Exactly how many saw cuts the cutting order for this sheet will have:
+ * the two reference-edge trims (when there is edge trim) plus, for every
+ * piece, one cut for each side where the piece is smaller than the workpiece
+ * it is cut from. Matches cuts.js step for step.
+ */
+export function countSheetCuts(P, sh) {
+  const { cuts, farX, farY } = tallyCuts(P, sh);
+  if (P.favor !== 'cuts' && !P.cutsMode) return cuts;
+  return cuts - Math.max(0, farX - 1) - Math.max(0, farY - 1);
+}
+
+/**
+ * The "prefer fewer cuts" stage. `base` is the finished large-offcuts layout
+ * and acts as a ceiling: nothing is accepted that leaves more pieces
+ * unplaced, uses more sheets or uses more stock area than it does.
+ *
+ * Cuts are saved where a piece exactly fills the width or length of the
+ * piece it is cut from, so the search looks for layouts that line parts of
+ * equal size up in strips:
+ *   1. a whole-job search whose objective counts cuts (kept only if it is
+ *      within the ceiling),
+ *   2. each sheet re-packed on its own for fewer cuts,
+ *   3. pairs of sheets pooled and re-packed, so parts of the same size can
+ *      move onto the same sheet.
+ * The layout with the fewest cuts wins; ties go to the better offcuts, and
+ * if nothing beats the base layout it is returned unchanged.
+ */
+function* reduceCuts(P0, base, opts = {}) {
+  const P = { ...P0, cutsMode: true };
+  const { k, stocks } = P;
+  const forcedRoot = P.firstCut !== 'auto';
+  const ref2 = P.refArea * P.refArea;
+  const start = Date.now();
+  const limit = opts.timeLimitMs ?? Infinity;
+  const deadline = start + limit;
+  const sheetIter = opts.cutSheetIterations ?? 600;
+  const pairIter = opts.cutPairIterations ?? 900;
+
+  const areaOf = (sheets) => sheets.reduce((n, sh) => n + stocks[sh.stock].area, 0);
+  const cutsOf = (sheets) => sheets.reduce((n, sh) => n + countSheetCuts(P, sh), 0);
+  const scoreOf = (sheets) => sheets.reduce((n, sh) => n + sheetQ(sh.root, k, forcedRoot) / ref2 + (sh.area * sh.area) / ref2, 0);
+  const ceiling = [base.unplacedItems.length, base.sheets.length, areaOf(base.sheets)];
+  const within = (sol) => {
+    const r = [sol.unplacedItems.length, sol.sheets.length, areaOf(sol.sheets)];
+    for (let i = 0; i < 3; i++) if (r[i] !== ceiling[i]) return r[i] < ceiling[i];
+    return true;
+  };
+  const copy = (sol) => ({ sheets: sol.sheets.map((sh) => ({ stock: sh.stock, root: sh.root, area: sh.area })), unplacedItems: sol.unplacedItems.slice() });
+
+  const candidates = [copy(base)];
+  if (P.itemType.length > 1) {
+    const g = search(P, { iterations: opts.iterations, seed: (opts.seed ?? 20240611) + 7, deadline: start + limit * 0.35 });
+    let r = g.next();
+    while (!r.done) { yield 0.4 * r.value; r = g.next(); }
+    const found = copy(r.value);
+    if (within(found)) candidates.push(found);
+  }
+
+  let done = 0;
+  for (const cand of candidates) {
+    const sheets = cand.sheets;
+    // each sheet on its own
+    for (let i = 0; i < sheets.length; i++) {
+      const sh = sheets[i];
+      const items = sheetItems(sh.root);
+      if (items.length < 2 || Date.now() > deadline) continue;
+      const re = repack(P, items, new Map([[sh.stock, 1]]), sheetIter, 4100 + i);
+      if (re && re.sheets.length === 1 && countSheetCuts(P, re.sheets[0]) < countSheetCuts(P, sh)) sheets[i] = re.sheets[0];
+      yield 0.4 + 0.6 * (done + 0.3 * ((i + 1) / sheets.length)) / candidates.length;
+    }
+    // pairs of sheets
+    let nextId = 1;
+    for (const sh of sheets) sh.id = nextId++;
+    const tried = new Set();
+    const maxTries = opts.maxCutPairTries ?? Math.min(40, 3 * sheets.length + 6);
+    let tries = 0, improved = true;
+    while (improved && sheets.length > 1) {
+      improved = false;
+      const pairs = [];
+      for (let i = 0; i < sheets.length; i++) {
+        for (let j = i + 1; j < sheets.length; j++) {
+          if (!tried.has(`${sheets[i].id}|${sheets[j].id}`)) pairs.push([sheets[i], sheets[j], countSheetCuts(P, sheets[i]) + countSheetCuts(P, sheets[j])]);
+        }
+      }
+      pairs.sort((x, y) => y[2] - x[2]);
+      for (const [a, b, oldCuts] of pairs) {
+        if (tries >= maxTries || Date.now() > deadline) break;
+        tried.add(`${a.id}|${b.id}`);
+        tries++;
+        const counts = new Map([[a.stock, 1]]);
+        counts.set(b.stock, (counts.get(b.stock) ?? 0) + 1);
+        const re = repack(P, sheetItems(a.root).concat(sheetItems(b.root)), counts, pairIter, 4300 + tries);
+        yield 0.4 + 0.6 * (done + 0.3 + 0.7 * Math.min(1, tries / maxTries)) / candidates.length;
+        if (!re || areaOf(re.sheets) > areaOf([a, b])) continue;
+        if (re.sheets.length < 2 || cutsOf(re.sheets) < oldCuts) {
+          sheets.splice(sheets.indexOf(a), 1);
+          sheets.splice(sheets.indexOf(b), 1);
+          for (const sh of re.sheets) { sh.id = nextId++; sheets.push(sh); }
+          improved = true;
+          break;
+        }
+      }
+    }
+    done++;
+  }
+
+  let best = candidates[0];
+  let bestKey = [areaOf(best.sheets), cutsOf(best.sheets), -scoreOf(best.sheets)];
+  // fewer sheets or less stock would be a bonus; otherwise fewest cuts, then best offcuts
+  for (const cand of candidates.slice(1)) {
+    const key = [areaOf(cand.sheets), cutsOf(cand.sheets), -scoreOf(cand.sheets)];
+    const a = [cand.unplacedItems.length, cand.sheets.length, ...key];
+    const b = [best.unplacedItems.length, best.sheets.length, ...bestKey];
+    let wins = false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { wins = a[i] < b[i] - (i === 4 ? 1e-9 : 0); break; }
+    if (wins) { best = cand; bestKey = key; }
+  }
+  for (const sh of best.sheets) { sh.root.root = true; applyFlips(sh.root, k, forcedRoot); delete sh.id; }
+  return best;
+}
+
+/**
+ * Full solve for one material group. A generator yielding progress 0..1;
+ * returns { sheets: [{ stock, root, area }], unplacedItems } and, when the
+ * job favours fewer cuts, `baseline`: the large-offcuts layout it started
+ * from (for comparison).
+ */
+export function* solveGroup(P, opts = {}) {
+  const fewerCuts = P.favor === 'cuts';
+  const g = solveForOffcuts(P, opts);
+  let r = g.next();
+  while (!r.done) { yield fewerCuts ? r.value * 0.5 : r.value; r = g.next(); }
+  const base = r.value;
+  if (!fewerCuts) return base;
+  const c = reduceCuts(P, base, opts);
+  let cr = c.next();
+  while (!cr.done) { yield 0.5 + 0.5 * cr.value; cr = c.next(); }
+  return { ...cr.value, baseline: base.sheets };
 }
 
 /** Convenience for tests and non-UI callers. */

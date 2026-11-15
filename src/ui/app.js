@@ -143,11 +143,13 @@ menu.addEventListener('click', async (e) => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  } else if (act === 'print') {
-    if (!state().result) { toast('Calculate a cutting plan first.'); return; }
-    setTab('plan');
-    setTimeout(() => window.print(), 150);
   }
+});
+
+$('#print-btn').addEventListener('click', () => {
+  if (!state().result) { toast('Calculate a cutting plan first.'); return; }
+  setTab('plan');
+  setTimeout(() => window.print(), 150);
 });
 
 $('#file').addEventListener('change', async (e) => {

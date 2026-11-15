@@ -83,3 +83,24 @@ export function randomJob(seed) {
     firstCut: pick(['auto', 'auto', 'rip', 'cross']),
   });
 }
+
+/**
+ * A real job: kitchen cabinets and a frame, 36 pieces in two materials on
+ * 2438 x 1219 sheets (3 laminate, 2 birch plywood), 3 mm kerf, no trim,
+ * everything free to turn. CutList Optimizer cut it from 5 sheets in 55 cuts.
+ */
+export function kitchenJob(o = {}) {
+  const lam = stock({ id: 'lam', material: 'Laminate', length: 2438, width: 1219, qty: 3, grain: 'none' });
+  const bb = stock({ id: 'bb', material: 'Birch plywood', length: 2438, width: 1219, qty: 2, grain: 'none' });
+  const P = (name, length, width, qty, material) => panel(name, length, width, qty, { material, grain: 'any', faces: 0 });
+  const L = 'Laminate', B = 'Birch plywood';
+  return job([lam, bb], [
+    P('Fridge Big', 1241, 722, 1, L), P('Tallcab Big face', 1521, 454, 1, L), P('Tallcab Small face', 759, 454, 1, L),
+    P('Sink Cab Face', 912, 756, 1, L), P('Fridge Small', 722, 475, 1, L), P('Fridge Condenser', 722, 521, 1, L),
+    P('Tall Cab End', 2375, 630, 1, L), P('CornerCab Face', 759, 531, 1, L), P('Dishwasher Side', 635, 876, 1, L),
+    P('Half Fridge divider', 1381, 641, 1, L), P('SmallCab Face', 759, 302, 1, L), P('3Drawer Small', 607, 124, 2, L),
+    P('3Drawer Med', 251, 607, 2, L), P('3Drawer Large', 378, 607, 2, L),
+    P('Fridge divider', 2286, 630, 1, B), P('Shelf Back', 1068, 235, 1, B), P('Vertical divider frame', 763, 100, 8, B),
+    P('Horizonal divider frame', 430, 100, 8, B), P('Right Upper2', 1222, 100, 1, B),
+  ], { kerf: 3, ...o });
+}

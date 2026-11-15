@@ -1,7 +1,7 @@
 // Entry point of the engine: job in, verified cutting plan out.
 
 import { analyzeJob } from './model.js';
-import { buildGroupProblem, solveGroup } from './packer.js';
+import { buildGroupProblem, solveGroup, farTrimPlan } from './packer.js';
 import { buildCutPlan } from './cuts.js';
 import { verifyResult } from './verify.js';
 
@@ -13,7 +13,8 @@ function defaultIterations(nItems) {
 
 /**
  * Generator form: yields progress (0..1) and returns the result.
- * opts: { iterations, polishIterations, seed, timeLimitMs }
+ * opts: { iterations, seed, timeLimitMs } plus the packer's tuning knobs.
+ * The job's own `favor` setting ('offcuts' or 'cuts') picks the objective.
  */
 export function* optimizeGen(job, opts = {}) {
   const { issues, problem, blocking } = analyzeJob(job);
@@ -25,16 +26,15 @@ export function* optimizeGen(job, opts = {}) {
   const groups = [];
   let donePieces = 0;
   const started = Date.now();
+  const baseline = { favor: 'offcuts', sheets: 0, cuts: 0, cutLength: 0, offcutArea: 0, largestOffcut: { w: 0, h: 0 } };
 
   for (const group of problem.groups) {
     const P = buildGroupProblem(problem, group);
     const n = P.itemType.length;
     const share = n / totalPieces;
     const gen = solveGroup(P, {
+      ...opts,
       iterations: opts.iterations ?? defaultIterations(n),
-      polishIterations: opts.polishIterations,
-      pairIterations: opts.pairIterations,
-      seed: opts.seed,
       timeLimitMs: opts.timeLimitMs ? Math.max(300, opts.timeLimitMs * share) : undefined,
     });
     let r = gen.next();
@@ -48,11 +48,12 @@ export function* optimizeGen(job, opts = {}) {
     let partsArea = 0;
     for (const pi of group.panels) partsArea += problem.panels[pi].l * problem.panels[pi].w * problem.panels[pi].qty;
     const usable = Math.max(...P.stocks.map((s) => s.L * s.W));
-    const groupSheets = sol.sheets.map((sh) => {
+    const planFor = (sh, isBaseline) => {
       const stock = P.stocks[sh.stock].ref;
       const plan = buildCutPlan({
         L: stock.L, W: stock.W, trim: problem.trim, kerf: problem.kerf,
         root: sh.root, minOffcut: problem.minOffcut,
+        farTrim: isBaseline === true ? null : farTrimPlan(P, sh),
         panelOfItem: (it) => P.types[P.itemType[it]].panelIdx,
       });
       let area = 0;
@@ -62,7 +63,21 @@ export function* optimizeGen(job, opts = {}) {
       let cutLength = 0;
       for (const s of plan.steps) cutLength += s.length;
       return { stockIdx: stock.idx, groupKey: group.key, ...plan, partsArea: area, offcutArea, cutLength };
-    });
+    };
+    const groupSheets = sol.sheets.map((sh) => planFor(sh, false));
+    // In fewer-cuts mode the solver also hands back the large-offcuts layout it
+    // started from, so the two can be compared without a second run.
+    if (sol.baseline) {
+      for (const sh of sol.baseline.map((b) => planFor(b, true))) {
+        baseline.sheets++;
+        baseline.cuts += sh.steps.length;
+        baseline.cutLength += sh.cutLength;
+        baseline.offcutArea += sh.offcutArea;
+        for (const o of sh.leftovers) {
+          if (o.kind === 'offcut' && o.w * o.h > baseline.largestOffcut.w * baseline.largestOffcut.h) baseline.largestOffcut = { w: o.w, h: o.h };
+        }
+      }
+    }
     groupSheets.sort((a, b) => a.stockIdx - b.stockIdx || b.partsArea - a.partsArea);
     sheets.push(...groupSheets);
 
@@ -115,7 +130,9 @@ export function* optimizeGen(job, opts = {}) {
     stocks: problem.stocks.map((s) => ({ ...s, qty: Number.isFinite(s.qty) ? s.qty : null, used: stockUse[s.idx] })),
     groups, sheets, unplaced, totals,
     elapsedMs: Date.now() - started,
+    favor: problem.favor,
   };
+  if (problem.favor === 'cuts') result.compare = baseline;
   result.check = verifyResult(problem, result);
   return result;
 }
@@ -127,6 +144,18 @@ export function optimizeSync(job, opts = {}) {
   return r.value;
 }
 
+// Hand control back to the browser for a moment. A message channel is used
+// rather than a timer because browsers slow timers to one a second in
+// background tabs, which would eat the time limit without doing any work.
+function breathe() {
+  return new Promise((resolve) => {
+    if (typeof MessageChannel === 'undefined') { setTimeout(resolve, 0); return; }
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => { ch.port1.close(); resolve(); };
+    ch.port2.postMessage(0);
+  });
+}
+
 /** Runs in slices so the page stays responsive; onProgress gets 0..1. */
 export async function optimizeAsync(job, opts = {}) {
   const gen = optimizeGen(job, { timeLimitMs: 6000, ...opts });
@@ -135,7 +164,7 @@ export async function optimizeAsync(job, opts = {}) {
   while (!r.done) {
     if (Date.now() - last > 40) {
       opts.onProgress?.(r.value);
-      await new Promise((res) => setTimeout(res, 0));
+      await breathe();
       last = Date.now();
     }
     r = gen.next();
