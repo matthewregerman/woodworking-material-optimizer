@@ -35,21 +35,17 @@ Woodworkers who build cabinets, built-ins or furniture out of sheet goods like p
 
 These use the example job that opens with the app: kitchen base cabinets, 44 pieces in four materials.
 
-Setting up the job: units, saw kerf, edge trim, the choice between large offcuts and fewer cuts, and the stock sheets.
+Setting up the job: units, saw kerf, edge trim, the choice between large offcuts and fewer cuts, the stock sheets and the panels.
 
 ![Job setup](docs/images/1-project-setup.png)
 
-Entering the panels: size, quantity, material, grain, which faces show, and edge banding.
+The summary after calculating: sheets used, how much of the stock becomes parts, cuts per sheet, and what to pull or buy.
 
-![Panels](docs/images/2-panels.png)
-
-The summary after calculating: sheets used, how much of the stock becomes parts, offcuts, cuts and cost.
-
-![Summary](docs/images/3-summary.png)
+![Summary](docs/images/2-summary.png)
 
 One sheet's layout, with every cut numbered and the cuts listed in order. You can tick them off as you go.
 
-![Cut plan for one sheet](docs/images/4-cut-plan.png)
+![Cut plan for one sheet](docs/images/3-cut-plan.png)
 
 ## How it picks a layout
 
