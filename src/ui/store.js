@@ -1,15 +1,16 @@
 // App state and where it lives.
 //
-// Everything is kept in this browser's localStorage. When the page is served
-// by the bundled server (npm start) the same state is also saved to a file on
-// the computer, so a phone on the same Wi-Fi opens the same job, plan and
-// ticked-off cuts. Newest save wins.
+// The job, its plan and the ticked-off cuts are kept in this browser's
+// localStorage and saved after every change. To keep a copy or move a job to
+// another device, the user saves it to a job file (toJobFile / fromJobFile).
 
 import { exampleJob } from '../engine/example.js';
+import { RESULT_VERSION } from '../engine/optimize.js';
+import { analyzeJob } from '../engine/model.js';
+import { verifyResult } from '../engine/verify.js';
 import { newId } from './dom.js';
 
 const KEY = 'cabinet-optimizer/state/v1';
-const API = 'api/state';
 
 export const blankStock = () => ({ id: newId('s'), material: '', thickness: null, length: null, width: null, qty: null, faces: 2, grain: 'length', price: null });
 export const blankPanel = (like) => ({
@@ -76,66 +77,87 @@ export function jobHash(job) {
   return JSON.stringify(favor === 'cuts' ? { ...rest, favor } : rest);
 }
 
+/**
+ * The saved job file: the job, plus the cutting plan and ticked-off cuts when
+ * the plan is up to date with the job. A plan for an edited job is left out.
+ */
+export function toJobFile(state) {
+  const { job, result, resultHash, progress } = state;
+  const file = { app: 'cabinet-optimizer', version: 1, job };
+  if (result && resultHash === jobHash(job)) file.plan = { result, resultHash, progress: progress ?? {} };
+  return file;
+}
+
+/** The file as text: the job laid out so it can be read and edited, the plan on one line to keep the file small. */
+export function jobFileText(state) {
+  const { plan, ...head } = toJobFile(state);
+  const text = JSON.stringify(head, null, 2);
+  return plan ? `${text.slice(0, -2)},\n  "plan": ${JSON.stringify(plan)}\n}\n` : `${text}\n`;
+}
+
+/**
+ * True if a plan read from a file is really a plan for this job: the same
+ * panels and stock, and it passes the independent checker that every new plan
+ * goes through. Anything odd, including a plan that makes the checker throw, is refused.
+ */
+function planHolds(job, result) {
+  try {
+    const { problem, blocking } = analyzeJob(job);
+    if (blocking) return false;
+    const same = (a, b, keys) => a.length === b.length && a.every((x, i) => keys.every((k) => x[k] === b[i][k]));
+    if (!same(result.panels, problem.panels, ['name', 'l', 'w', 'qty', 'groupKey'])) return false;
+    if (!same(result.stocks, problem.stocks, ['L', 'W', 'groupKey', 'faces'])) return false;
+    const check = verifyResult(problem, result);
+    result.check = check; // never trust a "passed" that came from the file
+    return check.ok;
+  } catch { return false; }
+}
+
+/**
+ * Read a job file. The plan is kept only if it matches the job, was made by this
+ * version of the optimizer and passes the checker again. `rejected` is true when
+ * the file had a plan that was left out.
+ */
+export function fromJobFile(raw) {
+  const job = normalizeJob(raw?.job ?? raw);
+  const plan = raw?.plan;
+  const none = { job, result: null, resultHash: null, progress: {}, rejected: Boolean(plan) };
+  const usable = plan?.result?.version === RESULT_VERSION && plan.resultHash === jobHash(job) && planHolds(job, plan.result);
+  if (!usable) return none;
+  const progress = plan.progress && typeof plan.progress === 'object' && !Array.isArray(plan.progress) ? plan.progress : {};
+  return { job, result: plan.result, resultHash: plan.resultHash, progress, rejected: false };
+}
+
 export const store = {
   state: null,
-  serverOk: false,
-  onExternalChange: null, // called when a newer state arrives from the server
-  onStatus: null,
-  _timer: null,
+  saved: true, // false when the browser refused the last save (private mode, storage full or blocked)
+  onStatus: null, // called with `saved` after every save
 
   init() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY)); } catch { /* corrupt or unavailable */ }
     if (saved?.job) {
-      try { this.state = { ...saved, job: normalizeJob(saved.job) }; } catch { saved = null; }
+      try {
+        this.state = { job: normalizeJob(saved.job), result: saved.result ?? null, resultHash: saved.resultHash ?? null, progress: saved.progress ?? {} };
+      } catch { saved = null; }
     }
-    if (!saved?.job) this.state = this.fresh(exampleJob(), 0);
+    if (!saved?.job) this.state = this.fresh(exampleJob());
     return this.state;
   },
 
-  fresh(job, updatedAt = Date.now()) {
-    return { job, result: null, resultHash: null, progress: {}, updatedAt };
+  fresh(job) {
+    return { job, result: null, resultHash: null, progress: {} };
   },
 
-  replace(job) {
-    this.state = this.fresh(job);
-    this.save(true);
+  /** Start from a job, and optionally its plan and progress (from an opened file). */
+  replace(job, plan = {}) {
+    this.state = { ...this.fresh(job), ...plan };
+    this.save();
   },
 
   /** Persist after a change. */
-  save(now = false) {
-    this.state.updatedAt = Date.now();
-    try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch { /* private mode / full */ }
-    clearTimeout(this._timer);
-    this._timer = setTimeout(() => this.push(), now ? 0 : 700);
-  },
-
-  async push() {
-    if (!this.serverOk) return;
-    try {
-      const res = await fetch(API, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(this.state) });
-      this.onStatus?.(res.ok ? 'synced' : 'local');
-    } catch { this.onStatus?.('local'); }
-  },
-
-  /** Fetch the server copy; adopt it if it is newer than ours. */
-  async pull() {
-    if (!location.protocol.startsWith('http')) return false;
-    try {
-      const res = await fetch(API, { cache: 'no-store' });
-      if (!res.ok || res.headers.get('x-cabinet-optimizer') !== '1') return false;
-      this.serverOk = true;
-      this.onStatus?.('synced');
-      if (res.status === 204) { if (this.state.updatedAt > 0) this.push(); return false; }
-      const remote = await res.json();
-      if (remote?.job && (remote.updatedAt ?? 0) > (this.state.updatedAt ?? 0)) {
-        this.state = { ...this.fresh(normalizeJob(remote.job), remote.updatedAt), result: remote.result ?? null, resultHash: remote.resultHash ?? null, progress: remote.progress ?? {} };
-        try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch { /* ignore */ }
-        this.onExternalChange?.();
-        return true;
-      }
-      if ((this.state.updatedAt ?? 0) > (remote?.updatedAt ?? 0)) this.push();
-    } catch { /* offline or static hosting: local only */ }
-    return false;
+  save() {
+    try { localStorage.setItem(KEY, JSON.stringify(this.state)); this.saved = true; } catch { this.saved = false; }
+    this.onStatus?.(this.saved);
   },
 };

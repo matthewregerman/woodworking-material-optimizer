@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Builds cabinet-optimizer.html: the whole app (markup, styles, scripts) in
-// one file that opens with a double-click, no server needed.
+// one file that opens with a double-click.
 // Only this script needs esbuild; the app itself has no dependencies.
 
 import { build } from 'esbuild';

@@ -341,23 +341,52 @@ details.all-steps { margin-top: 0; }
 @media print {
   :root { font-size: 11pt; }
   body { background: #fff; display: block; }
-  .app-head .menu-wrap, #print-btn, .tabs, .app-foot, .calc-bar, .jump, .banner.warn .btn, .toggle, .stepper, .busy, .toast, #view-job, .done-toggle { display: none !important; }
-  .app-head { border: 0; padding: 0 0 6pt; }
+  .app-head .menu-wrap, #print-btn, .tabs, .app-foot, .calc-bar, .jump, .banner.warn .btn, .toggle, .stepper, .busy, .toast, #view-job, .done-toggle, .sheets-head, .zoom-btn { display: none !important; }
+  .app-head { border: 0; padding: 0 0 6pt; position: static; }
   .brand h1 { display: block; }
   .job-name { border: 0; padding: 0; }
   main { max-width: none; padding: 0; }
   #view-plan { display: block !important; }
   .card { border: 0; padding: 0; margin-bottom: 14pt; }
-  .sheet-card { break-before: page; }
-  .sheet-body { display: block; }
   .wide-only { display: table-cell !important; }
-  .zoom-btn { display: none !important; }
-  .figure { max-width: 100%; }
-  .steps { max-height: none; overflow: visible; border: 0; columns: 2; column-gap: 18pt; }
-  .step { break-inside: avoid; padding: 3pt 0; }
-  .step.sel { background: none; }
-  details.all-steps > summary { list-style: none; color: inherit; margin-top: 8pt; }
   .dim-mask, .wp-outline, .cut-hot, .measure { display: none; }
+
+  /* Page breaks. Nothing below may be cut in two by the end of a page. */
+  h2, h3, .sheet-head, .face-note, details.all-steps > summary { break-after: avoid; }
+  .stat, .banner, .favor-note > p, .fine, tr, .step, .sheet-head, .face-note { break-inside: avoid; }
+  thead { display: table-header-group; }
+  .table-wrap { overflow: visible; }
   .tbl { font-size: 9.5pt; }
+
+  /* One sheet: its heading and drawing start a page and stay in one piece. */
+  .sheet-card { break-before: page; }
+  .sheet-body { display: block; margin-top: 6pt; }
+  .sheet-figure { break-inside: avoid; }
+  .figure { width: 100%; }
+  /* The drawing scales down to fit the page it is on. A drawing never needs more
+     height than its width, so only a landscape page can be too short for it. */
+  .sheet-svg { display: block; width: auto; max-width: 100%; height: auto; margin: 0 auto; max-height: calc(100vh - 1.5in); }
+
+  /* The list of cuts may run onto more pages, but one cut is never split. */
+  .steps { max-height: none; overflow: visible; border: 0; columns: 2; column-gap: 18pt; }
+  .step { padding: 2.5pt 0; border-bottom: 0; gap: 5pt; }
+  .step.sel { background: none; }
+  .step > input { width: 11pt; height: 11pt; margin-top: 2pt; }
+  .step-body { gap: 5pt; padding: 0; }
+  .step-n { width: auto; min-width: 14pt; height: 14pt; padding: 0 2pt; box-sizing: border-box; border-width: 1pt; font-size: 7.5pt; }
+  .step-text { font-size: 8.5pt; }
+  .step-gives { font-size: 8pt; }
+  details.all-steps > summary { list-style: none; color: inherit; margin-top: 8pt; }
+  details.all-steps > summary::-webkit-details-marker { display: none; }
+
   #res-cutlist { break-before: page; }
+
+  /* On a landscape page the cuts run down the right of the drawing, then three across under it. */
+  @media (orientation: landscape) {
+    .sheet-figure { float: left; width: 64%; margin: 0 2% 6pt 0; }
+    .sheet-card::after { content: ""; display: block; clear: both; }
+    .steps { columns: auto; margin-top: 4pt; }
+    .step { display: inline-flex; width: 32%; margin-right: 1.3%; vertical-align: top; box-sizing: border-box; }
+    details.all-steps > summary { margin-top: 0; }
+  }
 }

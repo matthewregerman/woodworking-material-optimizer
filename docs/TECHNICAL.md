@@ -6,35 +6,41 @@ results, see the [project README](../README.md).
 
 Works out how to cut a list of cabinet panels from sheets of plywood (or any
 sheet goods) using as few sheets as possible, and tells you the order to make
-the cuts in. Runs entirely on your own computer: no accounts, no internet, no
-paid services.
+the cuts in. It runs in your browser. There is no server, you don't need an
+account, and it doesn't cost anything.
 
 ## Run it
 
-You need [Node.js](https://nodejs.org) 18 or newer (only to serve the page and
-run the tests; the app itself has no dependencies).
+To use the app you don't need to install anything.
 
-```bash
-npm start
-```
-
-Then open the address it prints:
-
-- **On this computer:** `http://localhost:5173`
-- **On your phone:** the `http://192.168.x.x:5173` address it prints, with the
-  phone on the same Wi-Fi. The phone shows the same job, the same plan and the
-  same ticked-off cuts as the computer (see "Phone sync" below).
-
-If the port is taken: `PORT=5174 npm start`.
-
-**No server at all:** double-click `cabinet-optimizer.html`. It is the whole
-app in one file. It saves in that browser only (no phone sync). After changing
-anything under `src/`, regenerate it with `npm install && npm run build`.
+- Open the hosted copy: <https://matthewregerman.github.io/woodworking-material-optimizer/>
+- Or double-click `cabinet-optimizer.html`. It is the whole app in one file and
+  works with no internet connection.
 
 The app opens with a realistic example job (three kitchen base cabinets in four
 materials). Press **Calculate cutting plan** to see it work. "Project Files ▾" has
-*New empty job*, *Load the example job* and open/save a job as a file; the
-printer button beside it prints the plan.
+*New empty job*, *Load the example job*, *Open a job file* and *Save job and
+plan to a file*; the printer button beside it prints the plan.
+
+The job, its plan and the ticked-off cuts are saved in the browser you are
+using, after every change. To move a job to another browser or device, save it
+to a file (see "Job files" below).
+
+### For developers
+
+Node.js 18 or newer is needed only for the tests and the build.
+
+`index.html` loads its scripts as ES modules, and browsers refuse to load
+modules from a double-clicked file. Serve the folder over HTTP instead:
+
+```bash
+python3 -m http.server 5173
+```
+
+Then open `http://localhost:5173`. Any static file server does the same job.
+`.claude/launch.json` starts this one. After changing anything under `src/`,
+`index.html` or `styles.css`, regenerate the one-file version with
+`npm install && npm run build`.
 
 ## Tests
 
@@ -42,7 +48,9 @@ printer button beside it prints the plan.
 npm test
 ```
 
-77 tests, about 40 seconds. See "How it was tested" below.
+95 tests, about a minute (46 seconds on my last full run; an earlier run took
+over 3 minutes while other programs were busy). Most of the time is the
+random-job and exhaustive-solver tests. See "How it was tested" below.
 
 ## What you enter
 
@@ -90,8 +98,9 @@ ends get edge banding.
 - **Cut list** — every panel with quantity, cut size, finished size (when
   banding thickness changes it), grain, faces, banded edges and which sheets it
   is on.
-- **Print** — the printer button in the header gives one page per sheet with the drawing and a
-  check-box list of its cuts, then the cut list.
+- **Print** — the printer button in the header prints the summary, then each
+  sheet starting on a new page with its drawing and a check-box list of its
+  cuts, then the cut list. See "Printing" below.
 
 ### How to read a cut
 
@@ -134,9 +143,17 @@ ever failed, the app would show a red "do not cut from this plan" banner.
 ## Design decisions (and why)
 
 **Stack.** Plain HTML/CSS/JavaScript modules with no framework and no runtime
-dependencies, a 100-line Node server, and Node's built-in test runner. Nothing
-to install or keep updated, and it will still run in ten years. `esbuild` is a
-dev-only dependency used to produce the single-file version.
+dependencies, and Node's built-in test runner. Nothing to install or keep
+updated, and it will still run in ten years. `esbuild` is a dev-only dependency
+used to produce the single-file version.
+
+**No server.** The app is static files: the hosted copy on GitHub Pages and the
+one-file `cabinet-optimizer.html`. An earlier version had a small Node server
+that copied the job to a file so a phone on the same Wi-Fi could open it. It
+is gone. Nobody needs Node to use the app, and a job now moves between devices
+as a job file. npm is only for the tests and the build. For local development
+I use `python3 -m http.server`, because it comes with macOS and most Linux
+systems and adds no dependency to the project.
 
 **Guillotine cuts only.** Every layout is built from straight edge-to-edge
 cuts, because that is what a table saw or track saw can do. Layouts that would
@@ -197,16 +214,17 @@ says why: too big, only fits against the grain, or needs a two-face sheet.
 enough, you still get a plan for what fits, with a red banner listing exactly
 which parts are missing.
 
-**Phone sync.** When served by `npm start`, the current job, plan and ticked-off
-cuts are also written to `data/state.json` on the computer, and any device that
-opens the page picks up the newest copy (checked on load, when the page regains
-focus, and every 20 seconds). Newest save wins; it is not built for two people
-editing at once. After updating the app, reload any page that is still open
-(on the phone too): a page running the old version does not know about newer
-settings and will drop them when it saves.
+**Where the job is saved.** The job, its plan and the ticked-off cuts are kept
+in the browser's own storage (`localStorage`) and written after every change.
+The line at the bottom of the page says "Saved in this browser". Storage
+belongs to one browser on one device and one address, so the hosted copy, the
+one-file version and a local development copy each keep their own job. If the
+browser refuses to store anything (some private windows, or storage turned
+off), the line changes to say the job is not saved and points to Project
+Files, where it can be saved to a file.
 
-**One job at a time.** Use *Save job to a file* / *Open a job file* to keep
-several.
+**One job at a time.** Use *Save job and plan to a file* and *Open a job file*
+to keep several. See "Job files" below.
 
 ## Large offcuts or fewer cuts
 
@@ -302,6 +320,85 @@ their saved plan still counts as up to date. The setting is stored in the job
 (and in job files); switching it marks the plan out of date until you
 recalculate.
 
+## Job files
+
+*Save job and plan to a file* downloads a `.json` file. *Open a job file* loads
+one, on a computer or a phone. This is how you keep several jobs, back one up,
+or move one to another device.
+
+The file holds the job (the stock, the panels and the settings) and, when the
+plan is up to date with the job, the plan and which cuts you have ticked off. The
+job part is laid out over many lines so it can be read and edited by hand. The
+plan is written on one line to keep the file small. The example kitchen job with
+its plan is about 42 KB, and the job alone is about 7 KB.
+
+When you open a file, the plan is kept only if all of these hold:
+
+- it was made by this version of the optimizer;
+- it matches the job in the file;
+- its panel and stock lists match the job, and it passes the independent checker
+  again (the same one every new plan goes through).
+
+The "passed" result stored in the file is ignored and worked out again, so a file
+cannot carry its own pass. If any of these fail, you get the job with no plan, a
+message says so, and you press Calculate again. A file with no plan, a file from
+before plans were saved, and a bare job all still open.
+
+The checker covers where every part sits and every cut. The summary numbers
+(sheet counts, percentages, totals) are read from the file as they are, not worked
+out again, so a hand-edited summary would show wrong figures. The drawing and the
+cut list would still be right.
+
+Saving always downloads a copy. The page does not overwrite the file you opened.
+Browsers other than desktop Chrome and Edge cannot do that, and no phone browser
+can, so I did not build it for one browser only.
+
+The format is in `toJobFile`, `jobFileText` and `fromJobFile` in
+`src/ui/store.js`, and is tested in `test/jobfile.test.js`.
+
+## Printing
+
+The rules for paper:
+
+- Each sheet starts on a new page. Its heading and drawing stay together in
+  one piece. A page break never runs through a drawing.
+- A drawing that would be taller than the page is scaled down to fit. This
+  happens with square sheets on landscape paper.
+- A long list of cuts runs onto more pages. A page break falls between two
+  cuts, never inside one.
+- Rows of the summary tables and the cut list are not split. A table that runs
+  onto a second page repeats its header.
+
+How it does this:
+
+- When printing starts, every drawing is redrawn for paper: the whole sheet,
+  long side across the page, every cut numbered, no cut highlighted. The
+  screen drawing comes back afterwards. This is why a plan printed from a
+  phone, where the screen drawing is turned on its side, prints the same as
+  one printed from a computer.
+- The paper drawing is laid out 640 px wide, which is narrower than any common
+  page. The page then scales it up to its own width, so the labels and cut
+  numbers print larger than they were laid out. A square sheet on landscape
+  Letter is the tightest case and comes out at about 0.9 of the laid-out size,
+  with 13 px labels printing at about 9 pt.
+- The height limit is the page height minus 1.5 inches for the sheet's
+  heading. The page size comes from the print dialog, so it follows the paper,
+  orientation and margins chosen there.
+- On portrait paper the cuts are listed in two columns under the drawing. On
+  landscape paper the drawing takes the left 64% of the page, the cuts run
+  down the right of it and then three across underneath.
+- The list of cuts prints in a smaller type (8.5 pt) than on screen, so that a
+  sheet with up to about 14 cuts fits on one portrait page with its drawing.
+- Printing from the Job tab prints the plan too.
+
+What I checked: Chrome 157, printing to PDF, at Letter and A4, portrait and
+landscape, for the example kitchen job (5 sheets, one of them square), a
+one-sheet job with 10 cuts, and a two-sheet job with 82 and 109 cuts. I also
+printed the example from a 375 px wide window, from the Job tab, and from the
+one-file version. I looked at every page. Safari and Firefox were not checked.
+A sheet with 70 or more parts is hard to read at page size whatever the
+layout, because the parts themselves are small.
+
 ## Limits and things to know
 
 - **It is a heuristic, not a proof.** "✓ fewest possible" is only shown when
@@ -317,10 +414,8 @@ recalculate.
 - **Rip / crosscut wording follows the sheet's grain,** so trimming a narrow
   strip to length can be called a rip. The measurement, the cut length and the
   drawing make clear which way the cut goes.
-- **The server has no password.** Anyone on your home network who knows the
-  address can open and change the current job. It only serves the app's own
-  files and reads/writes `data/state.json`. To keep it to this computer only:
-  `HOST=127.0.0.1 npm start`.
+- **The saved job lives in one browser.** Clearing that browser's site data
+  removes it. Save a job file for anything you want to keep.
 - **Fewer cuts is a search too.** It finds layouts with fewer cuts, not
   provably the fewest. On a job where it finds nothing better it hands back the
   large-offcuts plan and says so.
@@ -361,9 +456,9 @@ Automated (`npm test`):
 By hand, in a real browser, at desktop (1280 px) and phone (375 px) widths:
 loading the example, calculating, stepping through cuts, ticking them off,
 tapping parts and cut numbers, invalid input of several kinds, inches, running
-out of stock, the menu and replace-job dialog, reload persistence, a second
-"device" picking up the plan from the server, the print layout (emulated on
-screen), the single-file version opened straight from disk, and switching
+out of stock, the menu and replace-job dialog, reload persistence, saving a
+job file and opening it again, printing to PDF (see "Printing"), the
+single-file version opened straight from disk, and switching
 between large offcuts and fewer cuts (the plan goes "out of date", recalculating
 redraws every sheet and its cutting order, and a job saved before the option
 existed opens with its plan still current).
@@ -381,9 +476,7 @@ src/engine/                 the optimizer (no browser code; usable from Node)
   optimize.js               ties it together
   example.js                the example job
 src/ui/                     the interface
-server.js                   local server + phone sync
 scripts/build-standalone.js builds cabinet-optimizer.html
 cabinet-optimizer.html      the single-file version
 test/                       automated tests
-data/state.json             your current job (created on first save; not in git)
 ```

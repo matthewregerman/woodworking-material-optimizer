@@ -11,7 +11,10 @@ const money = (v) => v.toLocaleString(undefined, { minimumFractionDigits: v % 1 
 
 export function createResultsView(root, ctx) {
   // ctx: { getState(), stale(), recalc(), goToJob(), save() }
-  const ui = { selected: {}, numbers: true, zoom: true };
+  const ui = { selected: {}, numbers: true, zoom: true, print: false };
+  // Drawings for paper are laid out at this width and scaled by the page. It is
+  // narrower than a page, so the scaling makes labels bigger, never smaller.
+  const PRINT_WIDTH = 640;
   const sheetViews = [];
   let lastWidth = 0;
 
@@ -113,8 +116,15 @@ export function createResultsView(root, ctx) {
     const setDone = (n, v) => { done()[n - 1] = v; ctx.save(); update(); };
 
     function drawFigure() {
-      const width = Math.max(240, Math.floor(figure.clientWidth || root.clientWidth - 40));
       const longAlongX = stock.L >= stock.W;
+      if (ui.print) {
+        // on paper: the whole sheet, long side across, every cut numbered, nothing highlighted
+        clear(figure).append(sheetDiagram(sheet, result, u, {
+          widthPx: PRINT_WIDTH, vertical: !longAlongX, selected: 0, done: done(), showNumbers: true, zoom: false,
+        }));
+        return;
+      }
+      const width = Math.max(240, Math.floor(figure.clientWidth || root.clientWidth - 40));
       const narrow = width < 520;
       const zoom = narrow && ui.zoom && sel() > 0;
       clear(figure).append(sheetDiagram(sheet, result, u, {
@@ -287,10 +297,18 @@ export function createResultsView(root, ctx) {
   // redraw the drawings when the available width changes (rotation, window resize)
   let timer = 0;
   new ResizeObserver(() => {
-    if (!root.clientWidth || Math.abs(root.clientWidth - lastWidth) < 8) return;
+    if (ui.print || !root.clientWidth || Math.abs(root.clientWidth - lastWidth) < 8) return;
     clearTimeout(timer);
     timer = setTimeout(() => { lastWidth = root.clientWidth; sheetViews.forEach((v) => v.drawFigure()); }, 120);
   }).observe(root);
 
-  return { render, redraw: () => sheetViews.forEach((v) => v.drawFigure()) };
+  /** Switch the drawings between their screen and paper versions (called around printing). */
+  function setPrint(on) {
+    if (ui.print === on) return;
+    ui.print = on;
+    if (on && ctx.getState().result && !sheetViews.length) render(); // printing straight from the Job tab
+    sheetViews.forEach((v) => v.drawFigure());
+  }
+
+  return { render, redraw: () => sheetViews.forEach((v) => v.drawFigure()), setPrint };
 }

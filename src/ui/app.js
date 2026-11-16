@@ -1,6 +1,6 @@
 // App shell: tabs, job file menu, calculate, persistence.
 
-import { store, blankJob, normalizeJob, jobHash } from './store.js';
+import { store, blankJob, jobHash, jobFileText, fromJobFile } from './store.js';
 import { createJobView } from './inputs.js';
 import { createResultsView } from './results.js';
 import { optimizeAsync, RESULT_VERSION } from '../engine/optimize.js';
@@ -91,7 +91,7 @@ async function calculate() {
   state().result = result;
   state().resultHash = jobHash(job);
   state().progress = {};
-  store.save(true);
+  store.save();
   updateFlags();
   setTab('plan');
 }
@@ -120,11 +120,12 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(
 
 const jobHasContent = () => state().job.panels.some((p) => p.name || p.length != null) || state().job.stock.some((s) => s.material);
 
-async function replaceJob(job, what) {
-  if (jobHasContent() && !(await confirmDialog(`${what} This replaces the job and plan you have open.`, 'Replace'))) return;
-  store.replace(job);
+async function replaceJob(job, what, plan) {
+  if (jobHasContent() && !(await confirmDialog(`${what} This replaces the job and plan you have open.`, 'Replace'))) return false;
+  store.replace(job, plan);
   renderAll();
-  setTab('job');
+  setTab(plan?.result ? 'plan' : 'job');
+  return true;
 }
 
 menu.addEventListener('click', async (e) => {
@@ -135,7 +136,7 @@ menu.addEventListener('click', async (e) => {
   else if (act === 'new') replaceJob(blankJob(state().job.units), 'Start a new empty job?');
   else if (act === 'import') $('#file').click();
   else if (act === 'export') {
-    const data = JSON.stringify({ app: 'cabinet-optimizer', version: 1, job: state().job }, null, 2);
+    const data = jobFileText(state());
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
     a.download = `${(state().job.name || 'cut-job').replace(/[^\w\- ]+/g, '').trim() || 'cut-job'}.json`;
@@ -157,8 +158,9 @@ $('#file').addEventListener('change', async (e) => {
   e.target.value = '';
   if (!file) return;
   try {
-    const raw = JSON.parse(await file.text());
-    await replaceJob(normalizeJob(raw.job ?? raw), `Open “${file.name}”?`);
+    const { job, rejected, ...plan } = fromJobFile(JSON.parse(await file.text()));
+    const opened = await replaceJob(job, `Open “${file.name}”?`, plan);
+    if (opened && rejected) toast('The plan saved in this file is out of date or did not pass the safety check, so only the job was opened. Press Calculate.');
   } catch (err) {
     toast(err instanceof SyntaxError ? 'That file is not a job file (it is not valid JSON).' : err.message);
   }
@@ -167,18 +169,23 @@ $('#file').addEventListener('change', async (e) => {
 // print with every step list open, drawings laid out for paper
 let reopened = [];
 window.addEventListener('beforeprint', () => {
+  resultsView.setPrint(true);
   reopened = $$('details.all-steps:not([open])');
   reopened.forEach((d) => { d.open = true; });
 });
-window.addEventListener('afterprint', () => { reopened.forEach((d) => { d.open = false; }); reopened = []; });
+window.addEventListener('afterprint', () => {
+  reopened.forEach((d) => { d.open = false; });
+  reopened = [];
+  resultsView.setPrint(false);
+});
 
-// ---- sync -----------------------------------------------------------------
-store.onStatus = (s) => { $('#sync-status').textContent = s === 'synced' ? 'Saved on this computer — open the same address on your phone to see this job' : 'Saved in this browser'; };
-store.onExternalChange = () => { renderAll(); toast('Updated with changes made on another device.'); };
-const pull = () => { if (document.visibilityState === 'visible' && !document.activeElement?.matches?.('input, select, textarea')) store.pull(); };
-document.addEventListener('visibilitychange', pull);
-window.addEventListener('focus', pull);
-setInterval(pull, 20000);
+// ---- where the job is saved ------------------------------------------------
+store.onStatus = (saved) => {
+  $('#save-status').textContent = saved
+    ? 'Saved in this browser'
+    : 'Not saved: this browser is blocking storage. Use Project Files to save the job to a file.';
+};
+store.save(); // also finds out, at start-up, whether this browser lets the page store anything
 
 // ---- go -------------------------------------------------------------------
 renderAll();
@@ -186,4 +193,3 @@ renderAll();
 let remembered = null;
 try { remembered = sessionStorage.getItem('tab'); } catch { /* ignore */ }
 setTab(state().result && remembered !== 'job' ? 'plan' : 'job');
-store.pull().then((changed) => { if (changed && state().result && remembered !== 'job') setTab('plan'); });

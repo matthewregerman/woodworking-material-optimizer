@@ -28,8 +28,9 @@ Woodworkers who build cabinets, built-ins or furniture out of sheet goods like p
 - It finds a layout that uses the fewest sheets, then picks between two ways of finishing the job (see below).
 - It draws every sheet to scale, with each cut shown at the width of the blade.
 - It gives you the cuts in order. Every cut goes edge to edge, so a table saw or track saw can make it, and the kerf is already taken out of every measurement.
-- You can step through the cuts and tick them off, print one page per sheet, or open it on a phone.
-- Every plan gets checked by separate code before it's shown. If a plan is wrong, the app tells you not to cut from it.
+- You can step through the cuts and tick them off, print the plan with each sheet starting on its own page, or open it on a phone.
+- You can save a job to a file, with its plan and the cuts you've ticked off, and open it later or on another device.
+- Every plan gets checked by separate code before it's shown. If a plan is wrong, the app tells you not to cut from it. A plan loaded from a saved file is checked again when you open it.
 
 ## Screenshots
 
@@ -63,7 +64,7 @@ I do most of my designs in SketchUp and export the cut list.
 1. Enter the cut list into the app on my laptop, along with my sheet sizes and saw kerf.
 2. Calculate, and pick large offcuts or fewer cuts depending on the project.
 3. Print the sheets and tick off each cut at the saw.
-4. The phone view shows the same plan and progress, and zooms in on the piece being cut.
+4. To follow the plan on my phone, I save the job and plan to a file, send the file to the phone and open it there. The phone view zooms in on the piece being cut.
 
 ## Results
 
@@ -88,23 +89,32 @@ I built the prompt with Sonnet 5.5, to optimize what I did and didn't feed Fable
 
 After the build, I read through the reports and commits, and ran my past projects through it as a test set to check performance. I then did a bit of UX tweaking to make it clearer and more intuitive, and added a second approach to optimization: instead of optimizing for material used, it can also optimize for the fewest number of cuts. That used a [second prompt](docs/prompts/02-fewer-cuts-prompt.md).
 
-It ended up with an optimizer, a layer that checks every plan, and 77 automated tests. The details are in [docs/TECHNICAL.md](docs/TECHNICAL.md).
+It ended up with an optimizer, a layer that checks every plan, and 95 automated tests. The details are in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
 ## Run it
 
-You need [Node.js](https://nodejs.org) 18 or newer.
+Open [the app](https://matthewregerman.github.io/woodworking-material-optimizer/) in a browser. You can also download `cabinet-optimizer.html` from this repository and double-click it. It's the whole app in one file. You don't need to install anything either way.
+
+It loads an example three-cabinet kitchen. Press Calculate cutting plan to see it work.
+
+The job is saved in the browser you are using, after every change. To keep a copy or move a job to another device, use Project Files, then Save job and plan to a file. Open it later with Open a job file.
+
+The app runs in your browser and your jobs stay there. You don't need an account, and it doesn't cost anything. The one-file version also works with no internet connection.
+
+### For developers
+
+You need [Node.js](https://nodejs.org) 18 or newer for the tests and the build. The app itself has no dependencies.
+
+`index.html` loads its scripts as modules, so it has to be served over HTTP. Double-clicking it won't work. From the project folder, run:
 
 ```bash
-npm start
+python3 -m http.server 5173
 ```
 
-Open `http://localhost:5173`. It loads an example three-cabinet kitchen. Press Calculate cutting plan to see it work.
+Then open `http://localhost:5173`.
 
-- To keep it on your computer only, run `HOST=127.0.0.1 npm start`. By default other devices on your Wi-Fi can reach it, which is how the phone view works. It has no password.
-- To run it with no server, double-click `cabinet-optimizer.html`. It's the whole app in one file and only saves in that browser.
 - Tests: `npm test`
-
-Everything runs on your computer. You don't need an account or an internet connection, and it doesn't cost anything.
+- Rebuild `cabinet-optimizer.html` after changing anything under `src/`, `index.html` or `styles.css`: `npm install`, then `npm run build`
 
 ## More
 

@@ -22,7 +22,7 @@
         <button type="button" data-act="new">New empty job</button>
         <hr>
         <button type="button" data-act="import">Open a job file…</button>
-        <button type="button" data-act="export">Save job to a file</button>
+        <button type="button" data-act="export">Save job and plan to a file</button>
       </div>
     </div>
     <button id="print-btn" class="btn icon" type="button" title="Print the cutting plan" aria-label="Print the cutting plan">
@@ -41,7 +41,7 @@
   </main>
 
   <footer class="app-foot">
-    <span id="sync-status">Saved in this browser</span>
+    <span id="save-status">Saved in this browser</span>
   </footer>
 
   <div id="busy" class="busy" hidden role="status" aria-live="polite">
@@ -65,7 +65,7 @@
   <div id="toast" class="toast" hidden role="status"></div>
   <input type="file" id="file" accept=".json,application/json" hidden>
 
-  <noscript><p style="padding:2rem">This app needs JavaScript. Open it with <code>npm start</code> or the standalone <code>cabinet-optimizer.html</code> file.</p></noscript>
+  <noscript><p style="padding:2rem">This app needs JavaScript.</p></noscript>
   <script type="module" src="src/ui/app.js"></script>
 </body>
 </html>
