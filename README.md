@@ -1,6 +1,8 @@
 # Woodworking Material Optimizer
 
-Give it your project plans and your sheet material, and it will tell you how to cut them from the fewest sheets possible.
+Give the material optimizer your woodworking project plans and your sheet material, and it will tell you how to cut them from the fewest sheets possible.
+
+[Try it out here!](https://matthewregerman.github.io/woodworking-material-optimizer/)
 
 I built it for my own upcoming cabinet project, tested it against real past projects that I built, and used it as a hands-on way to learn what Anthropic's Fable 5.2 can zero-shot with a reasonable brief.
 
