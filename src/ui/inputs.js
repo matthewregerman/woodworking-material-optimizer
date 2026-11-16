@@ -86,7 +86,7 @@ export function createJobView(root, ctx) {
         list: kind === 'stock' && f.key === 'material' ? 'material-names' : null,
       });
     }
-    return h('label', { class: `f f-${f.key}`, ...(f.tip ? { title: f.tip } : {}) }, h('span', { class: 'lbl' }, f.short ?? f.label), input);
+    return h('label', { class: `f f-${f.key}`, ...(f.tip ? { dataset: { tip: f.tip } } : {}) }, h('span', { class: 'lbl' }, f.short ?? f.label), input);
   }
 
   function rowEl(kind, row, index, fields) {
@@ -100,7 +100,7 @@ export function createJobView(root, ctx) {
   function headerEl(kind, fields) {
     return h('div', { class: `row row-head ${kind}-row`, 'aria-hidden': 'true' },
       h('div', { class: 'row-num' }, '#'),
-      fields.map((f) => h('div', { class: `f f-${f.key}${f.tip ? ' has-tip' : ''}`, ...(f.tip ? { title: f.tip } : {}) }, f.short ?? f.label)),
+      fields.map((f) => h('div', { class: `f f-${f.key}${f.tip ? ' has-tip' : ''}`, ...(f.tip ? { tabindex: '0', dataset: { tip: f.tip } } : {}) }, f.short ?? f.label)),
       h('div'));
   }
 
