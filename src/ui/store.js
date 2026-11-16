@@ -21,7 +21,7 @@ export function blankJob(units = 'mm') {
   const stock = blankStock();
   return {
     version: 1, name: '', units,
-    kerf: units === 'in' ? 3.175 : 3.2, trim: 0, bandThickness: 0,
+    kerf: units === 'in' ? 3.175 : 4, trim: 0, bandThickness: 0,
     minOffcut: units === 'in' ? 101.6 : 100, firstCut: 'auto', favor: 'offcuts',
     stock: [stock], panels: [blankPanel({ stockId: stock.id })],
   };

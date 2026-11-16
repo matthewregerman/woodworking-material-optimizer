@@ -286,7 +286,7 @@ apart.
 | Job | Sheets (both modes) | Cuts, large offcuts | Cuts, fewer cuts |
 | --- | --- | --- | --- |
 | Kitchen cabinets and frame — 36 pieces, 3 laminate + 2 birch sheets | 5 | 61 | 54 |
-| Built-in example — 44 pieces, 4 materials, 10 mm edge trim | 5 | 80 | 72 |
+| Built-in example — 44 pieces, 4 materials, 4 mm kerf, no edge trim | 5 | 67 | 61 |
 | Stair cabinets — 12 pieces, 1 sheet | 1 | 17 | 17 |
 | 20 random cabinet-style jobs — 711 pieces | 148 | 1346 | 1212 |
 
