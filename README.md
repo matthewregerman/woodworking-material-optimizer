@@ -16,7 +16,7 @@ Most woodworking projects start with a design and a list of materials that need 
 
 During a renovation a few years back, I had four different cabinet projects to do. I tried to plan the cuts by hand first and quickly learned that it was extremely hard. There were too many panels and too many ways to lay them out, and doing it for four projects was too much.
 
-So I looked online and paid for a cut-list optimizer with a monthly subscription. I used it for a month, then needed it for one more day to tweak some dimensions, and had to buy another full month. I only do this a few times a year, so a monthly subscription is the wrong way to pay for it. I was frustrated, but it was the only way I knew to get the job done.
+So I looked online and paid for a sheet-goods optimizer with a monthly subscription. I used it for a month, then needed it for one more day to tweak some dimensions, and had to buy another full month. I'm very project driven, and maybe only have one to two projects a year. A monthly subscription wasn't great for me, but I payed for it anyway to get the job done.
 
 Now we have more tools at our fingertips, and I have two more cabinetry projects coming up. It was a good chance to try again and see what a 2026 frontier model (Fable 5.2) can do. I also still had the commercial tool's layouts for my previous projects, so I had a clean test set to compare against.
 
