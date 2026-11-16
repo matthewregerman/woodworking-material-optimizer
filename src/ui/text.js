@@ -55,7 +55,7 @@ export function describeStep(step, sheet, result, units) {
         title: `Trim ${off} off the opposite ${long ? 'long' : 'short'} edge`,
         measure: null,
         take: `Take ${source}.`,
-        how: `${verb} at ${kept} from the reference edge, removing ${off} in total (blade included). Several parts end on this edge, so it is trimmed once for all of them.`,
+        how: `${verb} at ${kept} from the reference edge.`,
         a, b,
       };
     }
@@ -64,18 +64,16 @@ export function describeStep(step, sheet, result, units) {
       title: `Trim ${off} off one ${long ? 'long' : 'short'} edge`,
       measure: null,
       take: `Take ${source}.`,
-      how: `${verb} a clean edge, removing ${off} in total (blade included). This becomes a reference edge: later cuts are measured from it.`,
+      how: `Removes ${off} in total, blade included. Later cuts are measured from this edge.`,
       a, b,
     };
   }
 
   const size = step.dir === 'x' ? step.a.h : step.a.w;
   const across = formatU(step.dir === 'x' ? step.wp.h : step.wp.w, units);
-  const along = formatU(step.length, units);
   const measure = formatU(size, units);
-  let how = `Measure ${measure}${u} along its ${across}${u} side and cut straight across — a ${along}${u} long cut. `
-    + `The ${measure}${u} part is ${a.kind === 'panel' ? 'a finished panel' : 'exact'}; the ${kerf} kerf comes out of the other part.`;
-  if (!step.b) how = `Measure ${measure}${u} along its ${across}${u} side and cut straight across. This is a skim cut: the blade only takes the last sliver off the edge.`;
+  let how = `Measure ${measure}${u} along its ${across}${u} side; the ${kerf} kerf comes out of the other part.`;
+  if (!step.b) how = `Measure ${measure}${u} along its ${across}${u} side. Skim cut: the blade only takes the last sliver off the edge.`;
   return {
     verb, rip, isTrim: false,
     title: `${verb} at ${measure}${u}`,

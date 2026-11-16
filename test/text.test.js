@@ -16,7 +16,7 @@ test('a cut is described by the size of the part kept and what it yields', () =>
   assert.deepEqual(texts.map((t) => t.measure).sort(), ['300', '400']);
   const first = texts[0];
   assert.match(first.take, /full sheet \(1000 × 500\)/);
-  assert.match(first.how, /a 500 mm long cut/);
+  assert.match(first.how, /along its 1000 mm side/);
   assert.match(first.how, /4 mm kerf comes out of the other part/);
   assert.equal(first.a.kind, 'panel');
   const second = texts[1];

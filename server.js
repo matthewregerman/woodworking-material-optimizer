@@ -86,7 +86,7 @@ server.on('error', (err) => {
 server.listen(PORT, HOST, () => {
   const lan = Object.values(os.networkInterfaces()).flat()
     .filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
-  console.log('\n  Sheet Cut Planner is running.\n');
+  console.log('\n  Woodworking Material Optimizer is running.\n');
   console.log(`  On this computer:   http://localhost:${PORT}`);
   if (HOST === '0.0.0.0') for (const ip of lan) console.log(`  On your phone:      http://${ip}:${PORT}   (same Wi-Fi)`);
   console.log(`\n  Your job is saved in ${path.relative(process.cwd(), STATE_FILE) || STATE_FILE}`);

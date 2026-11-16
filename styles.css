@@ -73,6 +73,7 @@ main { flex: 1; width: 100%; max-width: 1320px; margin: 0 auto; padding: 16px; }
 /* ---- generic ----------------------------------------------------------- */
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
 .card-head { margin-bottom: 12px; }
+.row-head .has-tip { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
 .sub, .fine, .hint { color: var(--muted); font-size: 0.87rem; }
 .sub { margin-top: 4px; max-width: 78ch; }
 .fine { margin-top: 8px; max-width: 90ch; }
@@ -193,7 +194,6 @@ details.more > summary, details.all-steps > summary { cursor: pointer; font-weig
 
 .sheets-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 22px 2px 4px; }
 .toggle { font-size: 0.9rem; cursor: pointer; }
-.how-to-read { margin: 0 2px 12px; }
 
 .sheet-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .sheet-head h3 { margin: 0; font-size: 1.1rem; }

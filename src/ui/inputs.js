@@ -8,31 +8,31 @@ import { blankStock, blankPanel } from './store.js';
 const STOCK_FIELDS = [
   { key: 'material', label: 'Material', type: 'text', placeholder: 'e.g. Birch plywood' },
   { key: 'thickness', label: 'Thickness', type: 'len' },
-  { key: 'length', label: 'Length', type: 'len' },
+  { key: 'length', label: 'Length', type: 'len', tip: 'The face grain runs along the length unless “Grain runs” says otherwise' },
   { key: 'width', label: 'Width', type: 'len' },
   { key: 'grain', label: 'Grain runs', type: 'select', options: [['length', 'Along length'], ['width', 'Along width'], ['none', 'No grain']] },
   { key: 'faces', label: 'Good faces', type: 'select', numeric: true, options: [[2, 'Both faces'], [1, 'One face + back']] },
-  { key: 'qty', label: 'In stock', type: 'int', placeholder: 'any' },
+  { key: 'qty', label: 'In stock', type: 'int', placeholder: 'any', tip: 'Leave empty to buy as many as needed' },
   { key: 'price', label: 'Price each', type: 'num', placeholder: '—' },
 ];
 
 const PANEL_FIELDS = [
   { key: 'name', label: 'Panel name', type: 'text', placeholder: 'e.g. Cabinet side' },
-  { key: 'length', label: 'Length', type: 'len' },
-  { key: 'width', label: 'Width', type: 'len' },
+  { key: 'length', label: 'Length', type: 'len', tip: 'Finished length of the part' },
+  { key: 'width', label: 'Width', type: 'len', tip: 'Finished width of the part' },
   { key: 'qty', label: 'Qty', type: 'int' },
   { key: 'stockId', label: 'Material', type: 'material' },
-  { key: 'grain', label: 'Grain', type: 'select', options: [['length', 'Along length'], ['width', 'Along width'], ['any', 'Either way']] },
-  { key: 'faces', label: 'Faces seen', type: 'select', numeric: true, options: [[1, 'One face'], [2, 'Both faces'], [0, 'Hidden']] },
-  { key: 'bandL', label: 'Band long edges', short: 'Band long', type: 'select', numeric: true, options: [[0, '0'], [1, '1'], [2, '2']] },
-  { key: 'bandW', label: 'Band ends', short: 'Band ends', type: 'select', numeric: true, options: [[0, '0'], [1, '1'], [2, '2']] },
+  { key: 'grain', label: 'Grain', type: 'select', tip: 'Which way the grain should run on the part', options: [['length', 'Along length'], ['width', 'Along width'], ['any', 'Either way']] },
+  { key: 'faces', label: 'Faces seen', type: 'select', numeric: true, tip: '“Both faces” needs a sheet with two good faces', options: [[1, 'One face'], [2, 'Both faces'], [0, 'Hidden']] },
+  { key: 'bandL', label: 'Band long edges', short: 'Band long', type: 'select', numeric: true, tip: 'How many long edges get edge banding', options: [[0, '0'], [1, '1'], [2, '2']] },
+  { key: 'bandW', label: 'Band ends', short: 'Band ends', type: 'select', numeric: true, tip: 'How many ends get edge banding', options: [[0, '0'], [1, '1'], [2, '2']] },
 ];
 
 const SETTING_FIELDS = {
-  kerf: { label: 'Saw kerf', hint: 'Width of the slot your blade cuts.' },
-  trim: { label: 'Edge trim', hint: 'Taken off all four edges of every sheet (0 = use factory edges).' },
-  bandThickness: { label: 'Edge banding thickness', hint: 'Deducted from the cut size for each banded edge. Leave 0 for thin iron-on tape.' },
-  minOffcut: { label: 'Smallest offcut worth keeping', hint: 'Narrower leftovers are counted as waste.' },
+  kerf: { label: 'Saw kerf' },
+  trim: { label: 'Edge trim', hint: 'Off all four edges of every sheet.' },
+  bandThickness: { label: 'Edge banding thickness', hint: 'Deducted from the cut size for each banded edge.' },
+  minOffcut: { label: 'Smallest offcut worth keeping', hint: 'Narrower leftovers count as waste.' },
 };
 
 export function createJobView(root, ctx) {
@@ -86,7 +86,7 @@ export function createJobView(root, ctx) {
         list: kind === 'stock' && f.key === 'material' ? 'material-names' : null,
       });
     }
-    return h('label', { class: `f f-${f.key}` }, h('span', { class: 'lbl' }, f.short ?? f.label), input);
+    return h('label', { class: `f f-${f.key}`, ...(f.tip ? { title: f.tip } : {}) }, h('span', { class: 'lbl' }, f.short ?? f.label), input);
   }
 
   function rowEl(kind, row, index, fields) {
@@ -100,7 +100,7 @@ export function createJobView(root, ctx) {
   function headerEl(kind, fields) {
     return h('div', { class: `row row-head ${kind}-row`, 'aria-hidden': 'true' },
       h('div', { class: 'row-num' }, '#'),
-      fields.map((f) => h('div', { class: `f f-${f.key}` }, f.short ?? f.label)),
+      fields.map((f) => h('div', { class: `f f-${f.key}${f.tip ? ' has-tip' : ''}`, ...(f.tip ? { title: f.tip } : {}) }, f.short ?? f.label)),
       h('div'));
   }
 
@@ -114,7 +114,7 @@ export function createJobView(root, ctx) {
         h('span', { class: 'with-unit' },
           h('input', { type: 'text', inputmode: 'decimal', value: fmt(j[key]), autocomplete: 'off', dataset: { kind: 'settings', field: key, type: 'len' }, 'aria-label': f.label }),
           h('span', { class: 'unit' }, units() === 'in' ? 'in' : 'mm')),
-        h('span', { class: 'hint' }, f.hint),
+        f.hint ? h('span', { class: 'hint' }, f.hint) : null,
         h('span', { class: 'field-msg', dataset: { msgFor: key } }));
     };
     return h('section', { class: 'card', id: 'sec-settings' },
@@ -124,19 +124,18 @@ export function createJobView(root, ctx) {
           h('span', { class: 'setting-label' }, 'Units'),
           h('div', { class: 'seg', role: 'group', 'aria-label': 'Units' },
             ['mm', 'in'].map((u) => h('button', { type: 'button', class: j.units === u ? 'on' : '', 'aria-pressed': String(j.units === u), dataset: { units: u } }, u === 'mm' ? 'Millimetres' : 'Inches'))),
-          h('span', { class: 'hint' }, units() === 'in' ? 'Fractions are fine: 23 1/2, 3/4.' : 'Switching units converts what you have entered.')),
+          units() === 'in' ? h('span', { class: 'hint' }, 'Fractions are fine: 23 1/2, 3/4.') : null),
         lenSetting('kerf'),
         lenSetting('trim')),
       h('fieldset', { class: 'choice' },
-        h('legend', { class: 'setting-label' }, 'After using as few sheets as possible, prefer'),
+        h('legend', { class: 'setting-label' }, 'Secondary optimization'),
         h('div', { class: 'choice-opts' },
           [
-            ['offcuts', 'Large offcuts', 'Leftover is kept together in the biggest pieces possible, ready for the next job. May take more cuts.'],
-            ['cuts', 'Fewer cuts', 'Fewer cuts to measure and make. Leftover may end up in smaller pieces, or spread across more of the sheets.'],
+            ['offcuts', 'Large offcuts', 'Keeps leftover in the biggest pieces. May take more cuts.'],
+            ['cuts', 'Fewer cuts', 'Leftover may end up in smaller pieces.'],
           ].map(([value, title, text]) => h('label', { class: 'choice-opt' },
             h('input', { type: 'radio', name: 'favor', value, checked: (j.favor === 'cuts' ? 'cuts' : 'offcuts') === value, dataset: { kind: 'settings', field: 'favor', type: 'radio' } }),
-            h('span', { class: 'choice-text' }, h('strong', null, title), h('span', { class: 'hint' }, text))))),
-        h('span', { class: 'hint' }, 'Either way the plan never uses more sheets. “Fewer cuts” takes about twice as long to work out, and the plan shows how many cuts it saved.')),
+            h('span', { class: 'choice-text' }, h('strong', null, title), h('span', { class: 'hint' }, text)))))),
       h('details', { class: 'more', open: Boolean(j.bandThickness) || j.firstCut !== 'auto' },
         h('summary', null, 'More options'),
         h('div', { class: 'settings-grid' },
@@ -145,16 +144,13 @@ export function createJobView(root, ctx) {
           h('label', { class: 'setting' },
             h('span', { class: 'setting-label' }, 'First cuts on a full sheet'),
             h('select', { dataset: { kind: 'settings', field: 'firstCut', type: 'select' } },
-              [['auto', 'Whatever wastes least'], ['rip', 'Rip lengthwise first'], ['cross', 'Crosscut first']].map(([v, t]) => h('option', { value: v, selected: j.firstCut === v }, t))),
-            h('span', { class: 'hint' }, 'Ripping first suits a table saw; crosscutting first makes a big sheet easier to handle.')))));
+              [['auto', 'Whatever wastes least'], ['rip', 'Rip lengthwise first'], ['cross', 'Crosscut first']].map(([v, t]) => h('option', { value: v, selected: j.firstCut === v }, t)))))));
   }
 
   function stockSection() {
     const list = h('div', { class: 'rows', id: 'stock-rows' }, headerEl('stock', STOCK_FIELDS), job().stock.map((r, i) => rowEl('stock', r, i, STOCK_FIELDS)));
     return h('section', { class: 'card', id: 'sec-stock' },
-      h('div', { class: 'card-head' },
-        h('h2', null, 'Stock sheets'),
-        h('p', { class: 'sub' }, 'The sheets you will cut from. Length is the direction the face grain runs unless you say otherwise. Leave “In stock” empty if you will buy as many as needed.')),
+      h('div', { class: 'card-head' }, h('h2', null, 'Stock sheets')),
       list,
       h('datalist', { id: 'material-names' }, [...new Set(job().stock.map((x) => x.material.trim()).filter(Boolean))].map((m) => h('option', { value: m }))),
       h('button', { class: 'btn add', type: 'button', dataset: { add: 'stock' } }, '+ Add stock sheet'));
@@ -163,9 +159,7 @@ export function createJobView(root, ctx) {
   function panelSection() {
     const list = h('div', { class: 'rows', id: 'panel-rows' }, headerEl('panel', PANEL_FIELDS), job().panels.map((r, i) => rowEl('panel', r, i, PANEL_FIELDS)));
     return h('section', { class: 'card', id: 'sec-panels' },
-      h('div', { class: 'card-head' },
-        h('h2', null, 'Panels'),
-        h('p', { class: 'sub' }, 'Finished size of every part. “Grain” says which way the grain should run on the part; “Faces seen” decides whether it needs a sheet with two good faces. Banding counts the edges that get edge banding.')),
+      h('div', { class: 'card-head' }, h('h2', null, 'Panels')),
       list,
       h('button', { class: 'btn add', type: 'button', dataset: { add: 'panel' } }, '+ Add panel'));
   }

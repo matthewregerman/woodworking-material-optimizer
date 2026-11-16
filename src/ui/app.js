@@ -121,7 +121,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(
 const jobHasContent = () => state().job.panels.some((p) => p.name || p.length != null) || state().job.stock.some((s) => s.material);
 
 async function replaceJob(job, what) {
-  if (jobHasContent() && !(await confirmDialog(`${what} This replaces the job and plan you have open. Save it to a file first if you want to keep it.`, 'Replace'))) return;
+  if (jobHasContent() && !(await confirmDialog(`${what} This replaces the job and plan you have open.`, 'Replace'))) return;
   store.replace(job);
   renderAll();
   setTab('job');

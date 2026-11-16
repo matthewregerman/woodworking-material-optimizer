@@ -68,21 +68,13 @@ export function createResultsView(root, ctx) {
       h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
         h('thead', null, h('tr', null, h('th', null, 'Material'), h('th', { class: 'num' }, 'Sheets'), h('th', { class: 'num' }, 'Parts'), h('th', { class: 'num' }, 'Used'), h('th', null, 'Sheet count'))),
         h('tbody', null, groupRows))),
-      h('p', { class: 'fine' }, '“Fewest possible” means the parts’ total area could not fit on fewer sheets, whatever the layout. ',
-        'Every plan is re-checked after it is made: no overlaps, kerf between all parts, correct material, faces, grain and quantities.'),
       h('h3', null, 'Cuts'),
-      fewerCuts
-        ? h('div', { class: 'favor-note' },
-          h('p', null, 'This plan favours ', h('strong', null, 'fewer cuts'), '. ',
-            saved > 0
-              ? `It takes ${t.cuts} cuts where favouring large offcuts takes ${result.compare.cuts} — ${saved} fewer — on ${t.sheets < result.compare.sheets ? 'fewer' : 'the same number of'} sheets.`
-              : 'No layout with fewer cuts was found, so it is the same plan you would get favouring large offcuts.'),
-          saved > 0 ? h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
+      fewerCuts && saved > 0 ? h('div', { class: 'favor-note' }, h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
             h('thead', null, h('tr', null, h('th', null, 'Favouring'), h('th', { class: 'num' }, 'Cuts'), h('th', { class: 'num' }, 'Sawing'), h('th', null, 'Reusable offcuts'))),
             h('tbody', null,
               h('tr', null, h('td', { class: 'strong' }, 'Fewer cuts (this plan)'), h('td', { class: 'num strong' }, String(t.cuts)), h('td', { class: 'num' }, formatRun(t.cutLength, u)), h('td', null, offcutText(t.offcutArea, biggest))),
-              h('tr', null, h('td', null, 'Large offcuts'), h('td', { class: 'num' }, String(result.compare.cuts)), h('td', { class: 'num' }, formatRun(result.compare.cutLength, u)), h('td', null, offcutText(result.compare.offcutArea, result.compare.largestOffcut)))))) : null)
-        : h('p', { class: 'favor-note' }, 'This plan favours ', h('strong', null, 'large offcuts'), '. If you would rather make fewer cuts, choose “Fewer cuts” under Saw & settings on the Job tab and recalculate; the plan will show how many cuts that saves and what it costs in offcuts.'),
+              h('tr', null, h('td', null, 'Large offcuts'), h('td', { class: 'num' }, String(result.compare.cuts)), h('td', { class: 'num' }, formatRun(result.compare.cutLength, u)), h('td', null, offcutText(result.compare.offcutArea, result.compare.largestOffcut))))))) : null,
+      fewerCuts && saved <= 0 ? h('p', { class: 'favor-note' }, 'No layout with fewer cuts was found; this is the same plan as with large offcuts.') : null,
       h('div', { class: 'table-wrap' }, h('table', { class: 'tbl' },
         h('thead', null, h('tr', null, h('th', null, 'Sheet'), h('th', null, 'Material'), h('th', { class: 'num' }, 'Parts'), h('th', { class: 'num' }, 'Cuts'), h('th', { class: 'num' }, 'Used'))),
         h('tbody', null,
@@ -184,7 +176,7 @@ export function createResultsView(root, ctx) {
         h('div', { class: 'sheet-meta' }, stockTitle(stock, u)),
         h('div', { class: 'sheet-facts' },
           h('span', null, `${pct(used)} used`), h('span', null, plural(sheet.placements.length, 'part')), h('span', null, plural(total, 'cut')), progress)),
-      stock.faces === 1 ? h('p', { class: 'face-note' }, h('strong', null, 'One good face. '), 'Keep it up on a table saw, down under a circular or track saw, so tear-out lands on the back. Mark the good face before you start.') : null,
+      stock.faces === 1 ? h('p', { class: 'face-note' }, h('strong', null, 'One good face: '), 'up on a table saw, down under a circular or track saw.') : null,
       h('div', { class: 'sheet-body' },
         stepper,
         h('div', { class: 'sheet-figure' },
@@ -227,7 +219,7 @@ export function createResultsView(root, ctx) {
     });
     return h('section', { class: 'card', id: 'res-cutlist' },
       h('h2', null, 'Cut list'),
-      h('p', { class: 'sub' }, `Sizes as cut, length × width, in ${u === 'in' ? 'inches' : 'millimetres'}.${banded ? ' Cut sizes already allow for the edge banding thickness.' : ''}`),
+      h('p', { class: 'sub' }, `Length × width, in ${u === 'in' ? 'inches' : 'millimetres'}.`),
       h('div', { class: 'table-wrap' }, h('table', { class: 'tbl cutlist' },
         h('thead', null, h('tr', null,
           h('th', null, '#'), h('th', null, 'Panel'), h('th', { class: 'num' }, 'Qty'), h('th', { class: 'num' }, 'Cut size'),
@@ -281,9 +273,7 @@ export function createResultsView(root, ctx) {
       summary(result),
       h('div', { class: 'sheets-head' },
         h('h2', null, 'Layouts and cutting order'),
-        h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: ui.numbers, onchange: (e) => { ui.numbers = e.target.checked; sheetViews.forEach((v) => v.drawFigure()); } }), ' Show cut numbers')),
-      h('p', { class: 'fine how-to-read' },
-        `Every cut runs edge to edge across the piece in your hands. The number given is the size of the part you keep against the fence or mark from the reference edge; the ${formatU(result.kerf, u)}${unitSuffix(u)} kerf is taken from the other side, and all leftover sizes already have it subtracted. “Rip” runs along the grain, “crosscut” across it.`));
+        h('label', { class: 'toggle' }, h('input', { type: 'checkbox', checked: ui.numbers, onchange: (e) => { ui.numbers = e.target.checked; sheetViews.forEach((v) => v.drawFigure()); } }), ' Show cut numbers')));
     for (const sheet of result.sheets) {
       const view = sheetCard(sheet, result);
       sheetViews.push(view);
